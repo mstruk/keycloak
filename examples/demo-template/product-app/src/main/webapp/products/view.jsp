@@ -1,8 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=ISO-8859-1"
  pageEncoding="ISO-8859-1"%>
-<%@ page import="org.keycloak.constants.ServiceUrlConstants" %>
 <%@ page import="org.keycloak.example.oauth.ProductDatabaseClient" %>
-<%@ page import="org.keycloak.common.util.KeycloakUriBuilder" %>
+<%@ page import="org.keycloak.example.utils.ServletUtils" %>
 <%@ page session="false" %>
 <html>
 <head>
@@ -10,10 +9,8 @@
 </head>
 <body bgcolor="#F5F6CE">
 <%
-    String logoutUri = KeycloakUriBuilder.fromUri("/auth").path(ServiceUrlConstants.TOKEN_SERVICE_LOGOUT_PATH)
-            .queryParam("redirect_uri", "/product-portal").build("demo").toString();
-    String acctUri = KeycloakUriBuilder.fromUri("/auth").path(ServiceUrlConstants.ACCOUNT_SERVICE_PATH)
-            .queryParam("referrer", "product-portal").build("demo").toString();
+    String logoutUri = ServletUtils.getLogoutUrl(request, "/product-portal");
+    String acctUri = ServletUtils.getAccountUrl(request);
 %>
 
 <p>Goto: <a href="/customer-portal">customers</a> | <a href="<%=logoutUri%>">logout</a> | <a href="<%=acctUri%>">manage acct</a></p>

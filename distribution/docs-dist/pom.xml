@@ -37,6 +37,7 @@
                         <configuration>
                             <descriptors>
                                 <descriptor>assembly.xml</descriptor>
+                                <descriptor>assembly-restapi.xml</descriptor>
                             </descriptors>
                             <outputDirectory>
                                 target
@@ -44,7 +45,7 @@
                             <workDirectory>
                                 target/assembly/work
                             </workDirectory>
-                            <appendAssemblyId>false</appendAssemblyId>
+                            <appendAssemblyId>true</appendAssemblyId>
                         </configuration>
                     </execution>
                 </executions>

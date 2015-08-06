@@ -1,0 +1,22 @@
+<assembly>
+    <id>restapi</id>
+
+    <formats>
+        <format>war</format>
+    </formats>
+
+    <includeBaseDirectory>false</includeBaseDirectory>
+
+    <fileSets>
+        <fileSet>
+            <directory>../../services/target/restapi-docs/apidocs</directory>
+            <outputDirectory></outputDirectory>
+        </fileSet>
+        <fileSet>
+            <directory>src/restapi</directory>
+            <outputDirectory></outputDirectory>
+        </fileSet>
+
+    </fileSets>
+
+</assembly>

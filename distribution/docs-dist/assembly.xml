@@ -1,5 +1,5 @@
 <assembly>
-    <id>docs-dist</id>
+    <id>all</id>
 
     <formats>
         <format>zip</format>
@@ -13,7 +13,7 @@
             <outputDirectory>javadocs</outputDirectory>
         </fileSet>
         <fileSet>
-            <directory>../../services/target/apidocs</directory>
+            <directory>../../services/target/restapi-docs/apidocs</directory>
             <outputDirectory>rest-api</outputDirectory>
         </fileSet>
         <fileSet>

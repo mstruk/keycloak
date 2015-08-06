@@ -13,6 +13,9 @@
     <name>Keycloak REST Services</name>
     <description />
 
+    <properties>
+        <version.swagger.doclet>1.0.5</version.swagger.doclet>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -185,7 +188,7 @@
                     <target>${maven.compiler.target}</target>
                 </configuration>
             </plugin>
-            <plugin>
+            <!--plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <configuration>
@@ -208,7 +211,44 @@
                     <additionalparam>-disablejavascriptexample</additionalparam>
                     <additionalparam>-pathexcludefilter '/admin/.*index.*' -pathexcludefilter '/admin' -pathexcludefilter '/admin/\\{realm\\}/console.*'</additionalparam>
                 </configuration>
+            </plugin-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>generate-service-docs</id>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <doclet>com.carma.swagger.doclet.ServiceDoclet</doclet>
+                            <docletArtifact>
+                                <groupId>com.carma</groupId>
+                                <artifactId>swagger-doclet</artifactId>
+                                <version>${version.swagger.doclet}</version>
+                            </docletArtifact>
+
+                            <reportOutputDirectory>${project.basedir}/target/restapi-docs</reportOutputDirectory>
+                            <useStandardDocletOptions>false</useStandardDocletOptions>
+                            <additionalparam>-apiVersion 1 -docBasePath /apidocs -apiBasePath http://localhost:8080/auth</additionalparam>
+                        </configuration>
+                        <goals>
+                            <goal>javadoc</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
+    <profiles>
+        <profile>
+            <id>doclint-java8-disable</id>
+            <activation>
+                <jdk>[1.8,)</jdk>
+            </activation>
+
+            <properties>
+                <version.swagger.doclet>1.1.0</version.swagger.doclet>
+            </properties>
+        </profile>
+    </profiles>
 </project>

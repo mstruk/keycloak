@@ -212,31 +212,7 @@
                     <additionalparam>-pathexcludefilter '/admin/.*index.*' -pathexcludefilter '/admin' -pathexcludefilter '/admin/\\{realm\\}/console.*'</additionalparam>
                 </configuration>
             </plugin-->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-javadoc-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>generate-service-docs</id>
-                        <phase>generate-resources</phase>
-                        <configuration>
-                            <doclet>com.carma.swagger.doclet.ServiceDoclet</doclet>
-                            <docletArtifact>
-                                <groupId>com.carma</groupId>
-                                <artifactId>swagger-doclet</artifactId>
-                                <version>${version.swagger.doclet}</version>
-                            </docletArtifact>
 
-                            <reportOutputDirectory>${project.basedir}/target/restapi-docs</reportOutputDirectory>
-                            <useStandardDocletOptions>false</useStandardDocletOptions>
-                            <additionalparam>-apiVersion 1 -docBasePath /apidocs -apiBasePath http://localhost:8080/auth</additionalparam>
-                        </configuration>
-                        <goals>
-                            <goal>javadoc</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
     <profiles>
@@ -249,6 +225,150 @@
             <properties>
                 <version.swagger.doclet>1.1.0</version.swagger.doclet>
             </properties>
+        </profile>
+        <profile>
+            <id>jboss-release</id>
+
+            <repositories>
+                <repository>
+                    <snapshots>
+                        <enabled>false</enabled>
+                    </snapshots>
+                    <id>central</id>
+                    <name>bintray</name>
+                    <url>http://jcenter.bintray.com</url>
+                </repository>
+            </repositories>
+
+            <dependencies>
+                <dependency>
+                    <groupId>io.github.robwin</groupId>
+                    <artifactId>swagger2markup</artifactId>
+                    <version>0.7.1</version>
+                </dependency>
+            </dependencies>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>generate-service-docs</id>
+                                <phase>generate-resources</phase>
+                                <configuration>
+                                    <doclet>com.carma.swagger.doclet.ServiceDoclet</doclet>
+                                    <docletArtifact>
+                                        <groupId>com.carma</groupId>
+                                        <artifactId>swagger-doclet</artifactId>
+                                        <version>${version.swagger.doclet}</version>
+                                    </docletArtifact>
+
+                                    <reportOutputDirectory>${project.basedir}/target/restapi-docs</reportOutputDirectory>
+                                    <useStandardDocletOptions>false</useStandardDocletOptions>
+                                    <additionalparam>-skipUiFiles -apiVersion 1 -docBasePath /apidocs -apiBasePath http://localhost:8080/auth</additionalparam>
+                                </configuration>
+                                <goals>
+                                    <goal>javadoc</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-resources</id>
+                                <phase>process-resources</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.basedir}/target/swagger</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}/target/restapi-docs/apidocs</directory>
+                                            <includes>
+                                                <!--include>service.json</include-->
+                                                <include>admin.json</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>copy-css</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>copy-resources</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.basedir}/target/asciidoc-generated</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.basedir}</directory>
+                                            <includes>
+                                                <include>theme.css</include>
+                                            </includes>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>com.redowlanalytics</groupId>
+                        <artifactId>swagger2markup-maven-plugin</artifactId>
+                        <version>0.7.1</version>
+                        <executions>
+                            <execution>
+                                <id>gen-asciidoc</id>
+                                <phase>process-resources</phase>
+                                <goals>
+                                    <goal>process-swagger</goal>
+                                </goals>
+                                <configuration>
+                                    <inputDirectory>${project.basedir}/target/swagger</inputDirectory>
+                                    <outputDirectory>${project.basedir}/target/asciidoc</outputDirectory>
+                                    <!--separateDefinitions>true</separateDefinitions-->
+                                    <markupLanguage>asciidoc</markupLanguage>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <plugin>
+                        <groupId>org.asciidoctor</groupId>
+                        <artifactId>asciidoctor-maven-plugin</artifactId>
+                        <version>1.5.2</version>
+                        <executions>
+                            <execution>
+                                <id>generate-docs</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>process-asciidoc</goal>
+                                </goals>
+                                <configuration>
+                                    <sourceDirectory>${project.basedir}/target/asciidoc</sourceDirectory>
+                                    <outputDirectory>${project.basedir}/target/asciidoc-generated</outputDirectory>
+                                    <backend>html5</backend>
+                                    <attributes>
+                                        <!-- List of attributes:
+                                        https://github.com/asciidoctor/asciidoctorj/blob/master/asciidoctorj-core/src/main/java/org/asciidoctor/Attributes.java
+                                         -->
+                                        <toclevels>3</toclevels>
+                                        <toc>left</toc>
+                                        <doctype>book</doctype>
+                                        <stylesheet>theme.css</stylesheet>
+                                        <linkcss>true</linkcss>
+                                        <copycss>true</copycss>
+                                    </attributes>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

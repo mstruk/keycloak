@@ -42,17 +42,27 @@ class KeycloakSubsystemAdd extends AbstractBoottimeAddStepHandler {
 
     static final KeycloakSubsystemAdd INSTANCE = new KeycloakSubsystemAdd();
 
+    private String webContext;
+
     @Override
-    protected void performBoottime(final OperationContext context, final ModelNode operation, final ModelNode model, ServiceVerificationHandler verificationHandler, List<ServiceController<?>> newControllers) {
+    protected void performBoottime(final OperationContext context, final ModelNode operation, final ModelNode model, ServiceVerificationHandler verificationHandler, List<ServiceController<?>> newControllers) throws OperationFailedException {
         context.addStep(new AbstractDeploymentChainStep() {
             @Override
             protected void execute(DeploymentProcessorTarget processorTarget) {
+                processorTarget.addDeploymentProcessor(SUBSYSTEM_NAME,
+                        Phase.DEPENDENCIES,
+                        0,
+                        new KeycloakDependencyProcessor());
                 processorTarget.addDeploymentProcessor(SUBSYSTEM_NAME,
                         Phase.POST_MODULE, // PHASE
                         Phase.POST_MODULE_VALIDATOR_FACTORY - 1, // PRIORITY
                         new KeycloakServerDeploymentProcessor());
             }
         }, OperationContext.Stage.RUNTIME);
+
+        ServerUtil serverUtil = new ServerUtil(operation);
+        serverUtil.addStepToUploadServerWar(context);
+        KeycloakAdapterConfigService.INSTANCE.setWebContext(webContext);
     }
 
     protected void populateModel(final OperationContext context, final ModelNode operation, final Resource resource) throws  OperationFailedException {
@@ -77,10 +87,6 @@ class KeycloakSubsystemAdd extends AbstractBoottimeAddStepHandler {
         if (!webContextNode.isDefined()) {
             webContextNode = KeycloakSubsystemDefinition.WEB_CONTEXT.getDefaultValue();
         }
-        String webContext = webContextNode.asString();
-
-        ServerUtil serverUtil = new ServerUtil(operation);
-        serverUtil.addStepToUploadServerWar(context);
-        KeycloakAdapterConfigService.INSTANCE.setWebContext(webContext);
+        webContext = webContextNode.asString();
     }
 }

@@ -35,6 +35,7 @@
     <name>Keycloak Arquillian Integration TestSuite</name>
     
     <modules>
+        <module>services/event-queue</module>
         <module>servers</module>
         <module>tests</module>
     </modules>
@@ -56,6 +57,43 @@
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-dependency-plugin</artifactId>
                     <version>2.10</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-antrun-plugin</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>ant-contrib</groupId>
+                            <artifactId>ant-contrib</artifactId>
+                            <version>1.0b3</version>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>ant</groupId>
+                                    <artifactId>ant</artifactId>
+                                </exclusion>
+                            </exclusions>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.ant</groupId>
+                            <artifactId>ant-apache-bsf</artifactId>
+                            <version>1.9.3</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.apache.bsf</groupId>
+                            <artifactId>bsf-api</artifactId>
+                            <version>3.1</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>rhino</groupId>
+                            <artifactId>js</artifactId>
+                            <version>1.7R2</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.keycloak</groupId>
+                            <artifactId>keycloak-core</artifactId>
+                            <version>${project.version}</version>
+                        </dependency>
+                    </dependencies>
                 </plugin>
             </plugins>
         </pluginManagement>

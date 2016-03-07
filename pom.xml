@@ -1171,6 +1171,11 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.keycloak.testsuite</groupId>
+                <artifactId>integration-arquillian-event-queue</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.keycloak</groupId>
                 <artifactId>keycloak-testsuite-tools</artifactId>
                 <version>${project.version}</version>

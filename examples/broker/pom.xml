@@ -35,5 +35,8 @@
         <module>google-authentication</module>
         <module>saml-broker-authentication</module>
         <module>twitter-authentication</module>
+        <module>github-authentication</module>
+        <module>linkedin-authentication</module>
+        <module>microsoft-authentication</module>
     </modules>
 </project>

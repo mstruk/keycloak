@@ -65,8 +65,8 @@
           "storeToken" : "true",
           "addReadTokenRoleOnCreate" : true,
           "config": {
-            "clientId": "CHANGE_CLIENT_ID",
-            "clientSecret": "CHANGE_CLIENT_SECRET"
+            "clientId": "u9xprreCzNml7FCeiw4bhby3B",
+            "clientSecret": "8U85QUJndChcaCxgSqCRJrgF3OWT1a3jnd26BMWHS6ROeczFlI"
           }
         }
     ]

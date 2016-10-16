@@ -477,7 +477,7 @@ public class KcRegTest extends AbstractCliTest {
             assertExitCodeAndStreamSizes(exe, 0, 0, 0);
         }
     }
-
+/*
     @Test
     public void testCreateWithAllowedHostsWithoutAuthenticationNoConfig() throws IOException {
 
@@ -508,5 +508,5 @@ public class KcRegTest extends AbstractCliTest {
             Assert.assertNotNull("registrationAccessToken", client.getRegistrationAccessToken());
         }
     }
-
+*/
 }

@@ -383,6 +383,7 @@ public abstract class AbstractCliTest extends AbstractKeycloakTest {
         return token;
     }
 
+    /*
     void addLocalhostToAllowedHosts(String realm) {
         ClientRegistrationTrustedHostResource resource = adminClient.realm(realm).clientRegistrationTrustedHost();
 
@@ -394,7 +395,7 @@ public abstract class AbstractCliTest extends AbstractKeycloakTest {
 
         Assert.assertEquals("Created successfully", Response.Status.CREATED.getStatusCode(), response.getStatus());
     }
-
+    */
     void testCRUDWithOnTheFlyAuth(String serverUrl, String credentials, String extraOptions, String loginMessage) throws IOException {
 
         File configFile = getDefaultConfigFilePath();

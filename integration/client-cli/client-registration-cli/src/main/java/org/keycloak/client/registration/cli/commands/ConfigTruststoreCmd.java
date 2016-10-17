@@ -91,21 +91,36 @@ public class ConfigTruststoreCmd extends AbstractAuthOptionsCmd implements Comma
         // now update the config
         processGlobalOptions();
 
-        String store = truststore;
+        String store;
+        String pass;
 
-        if (store == null) {
-            throw new RuntimeException("No truststore specified");
+        if (!delete) {
+
+            if (truststore == null) {
+                throw new RuntimeException("No truststore specified");
+            }
+
+            if (!new File(truststore).isFile()) {
+                throw new RuntimeException("Truststore file not found: " + truststore);
+            }
+
+            if ("-".equals(trustPass)) {
+                trustPass = readSecret("Enter truststore password: ", commandInvocation);
+            }
+
+            store = truststore;
+            pass = trustPass;
+
+        } else {
+            if (truststore != null) {
+                throw new RuntimeException("Option --delete is mutually exclusive with specifying a TRUSTSTORE");
+            }
+            if (trustPass != null) {
+                throw new RuntimeException("Options --trustpass and --delete are mutually exclusive");
+            }
+            store = null;
+            pass = null;
         }
-
-        if (!delete && !new File(store).isFile()) {
-            throw new RuntimeException("Truststore file not found: " + store);
-        }
-
-        if ("-".equals(trustPass)) {
-            trustPass = readSecret("Enter truststore password: ", commandInvocation);
-        }
-
-        String pass = trustPass;
 
         saveMergeConfig(config -> {
             config.setTruststore(store);

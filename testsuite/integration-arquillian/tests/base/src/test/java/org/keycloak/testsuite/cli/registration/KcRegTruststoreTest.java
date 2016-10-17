@@ -80,7 +80,7 @@ public class KcRegTruststoreTest extends AbstractCliTest {
 
         // Check missing argument error
         KcRegExec exe = execute("config truststore");
-        assertExitCodeAndStreamSizes(exe, 0, 0, 1);
+        assertExitCodeAndStreamSizes(exe, 1, 0, 1);
         Assert.assertEquals("no truststore error", "No truststore specified", exe.stderrLines().get(0));
 
         // configure truststore with password
@@ -93,6 +93,14 @@ public class KcRegTruststoreTest extends AbstractCliTest {
 
         exe = execute("config truststore --delete");
         assertExitCodeAndStreamSizes(exe, 0, 0, 0);
+
+        exe = execute("config truststore --delete '" + truststore.getAbsolutePath() + "'");
+        assertExitCodeAndStreamSizes(exe, 1, 0, 1);
+        Assert.assertEquals("incompatible", "Option --delete is mutually exclusive with specifying a TRUSTSTORE", exe.stderrLines().get(0));
+
+        exe = execute("config truststore --delete --trustpass secret");
+        assertExitCodeAndStreamSizes(exe, 1, 0, 1);
+        Assert.assertEquals("no truststore error", "Options --trustpass and --delete are mutually exclusive", exe.stderrLines().get(0));
 
         FileConfigHandler cfghandler = new FileConfigHandler();
         cfghandler.setConfigFile(ConfigUtil.DEFAULT_CONFIG_FILE_PATH);

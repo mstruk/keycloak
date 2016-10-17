@@ -4,6 +4,7 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.keycloak.admin.client.resource.ClientInitialAccessResource;
 import org.keycloak.admin.client.resource.ClientRegistrationTrustedHostResource;
+import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.authentication.authenticators.client.ClientIdAndSecretAuthenticator;
 import org.keycloak.authentication.authenticators.client.JWTClientAuthenticator;
 import org.keycloak.client.registration.cli.config.ConfigData;
@@ -13,8 +14,13 @@ import org.keycloak.representations.idm.ClientInitialAccessCreatePresentation;
 import org.keycloak.representations.idm.ClientInitialAccessPresentation;
 import org.keycloak.representations.idm.ClientRegistrationTrustedHostRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.ComponentRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.keycloak.services.clientregistration.policy.ClientRegistrationPolicy;
+import org.keycloak.services.clientregistration.policy.ClientRegistrationPolicyManager;
+import org.keycloak.services.clientregistration.policy.RegistrationAuth;
+import org.keycloak.services.clientregistration.policy.impl.TrustedHostClientRegistrationPolicyFactory;
 import org.keycloak.testsuite.AbstractKeycloakTest;
 import org.keycloak.testsuite.cli.KcRegExec;
 import org.keycloak.testsuite.util.ClientBuilder;
@@ -383,19 +389,26 @@ public abstract class AbstractCliTest extends AbstractKeycloakTest {
         return token;
     }
 
-    /*
-    void addLocalhostToAllowedHosts(String realm) {
-        ClientRegistrationTrustedHostResource resource = adminClient.realm(realm).clientRegistrationTrustedHost();
-
-        ClientRegistrationTrustedHostRepresentation rep = new ClientRegistrationTrustedHostRepresentation();
-        rep.setHostName("localhost");
-        rep.setCount(100);
-
-        Response response = resource.create(rep);
-
-        Assert.assertEquals("Created successfully", Response.Status.CREATED.getStatusCode(), response.getStatus());
+    private ComponentRepresentation findPolicyByProviderAndAuth(String realm, String providerId, String authType) {
+        // Change the policy to avoid checking hosts
+        List<ComponentRepresentation> reps = adminClient.realm(realm).components().query(realm, ClientRegistrationPolicy.class.getName());
+        for (ComponentRepresentation rep : reps) {
+            if (rep.getSubType().equals(authType) && rep.getProviderId().equals(providerId)) {
+                return rep;
+            }
+        }
+        return null;
     }
-    */
+
+    void addLocalhostToAllowedHosts(String realm) {
+        RealmResource realmResource = adminClient.realm(realm);
+        String anonPolicy = ClientRegistrationPolicyManager.getComponentTypeKey(RegistrationAuth.ANONYMOUS);
+
+        ComponentRepresentation trustedHostRep = findPolicyByProviderAndAuth(realm, TrustedHostClientRegistrationPolicyFactory.PROVIDER_ID, anonPolicy);
+        trustedHostRep.getConfig().putSingle(TrustedHostClientRegistrationPolicyFactory.TRUSTED_HOSTS, "localhost");
+        realmResource.components().component(trustedHostRep.getId()).update(trustedHostRep);
+    }
+
     void testCRUDWithOnTheFlyAuth(String serverUrl, String credentials, String extraOptions, String loginMessage) throws IOException {
 
         File configFile = getDefaultConfigFilePath();

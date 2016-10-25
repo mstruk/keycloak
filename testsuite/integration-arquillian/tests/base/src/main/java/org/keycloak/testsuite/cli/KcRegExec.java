@@ -50,6 +50,11 @@ public class KcRegExec {
 
     private Throwable err;
 
+    private Thread stdoutRunner;
+
+    private Thread stderrRunner;
+
+
     private KcRegExec(String workDir, String argsLine, InputStream stdin) {
         this(workDir, argsLine, null, stdin);
     }
@@ -98,11 +103,11 @@ public class KcRegExec {
                 process = Runtime.getRuntime().exec(new String[]{"sh", "-c", cmd}, null, new File(workDir));
             }
 
-            new StreamReaderThread(process.getInputStream(), logStreams ? new LoggingOutputStream("STDOUT", stdout) : stdout)
-                    .start();
+            stdoutRunner = new StreamReaderThread(process.getInputStream(), logStreams ? new LoggingOutputStream("STDOUT", stdout) : stdout);
+            stdoutRunner.start();
 
-            new StreamReaderThread(process.getErrorStream(), logStreams ? new LoggingOutputStream("STDERR", stderr) : stderr)
-                    .start();
+            stderrRunner = new StreamReaderThread(process.getErrorStream(), logStreams ? new LoggingOutputStream("STDERR", stderr) : stderr);
+            stderrRunner.start();
 
             new StreamReaderThread(stdin, process.getOutputStream())
                     .start();
@@ -131,6 +136,11 @@ public class KcRegExec {
                 if (exitCode != 0) {
                     dumpStreams = true;
                 }
+
+                // just in case ... to make sure we read the whole output from the command
+                stdoutRunner.join(5000);
+                stderrRunner.join(5000);
+
             } else {
                 if (process.isAlive()) {
                     process.destroyForcibly();

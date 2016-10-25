@@ -16,6 +16,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 
 import static org.keycloak.client.registration.cli.util.OsUtil.CMD;
 import static org.keycloak.client.registration.cli.util.OsUtil.EOL;
@@ -26,7 +27,37 @@ import static org.keycloak.testsuite.cli.KcRegExec.execute;
  */
 public class KcRegTest extends AbstractCliTest {
 
+    static int loopCount = Integer.valueOf(System.getProperty("test.loop.count", "100"));
+
     @Test
+    public void bigTestLoop() throws Exception {
+
+        loop(() -> testNoArgs());
+        loop(() -> testHelpGlobalOption());
+        loop(() -> testBadCommand());
+        loop(() -> testBadOptionInPlaceOfCommand());
+        loop(() -> testBadOption());
+        loop(() -> testUserLoginWithCustomConfig());
+        loop(() -> testCustomConfigLoginCreateDelete());
+        loop(() -> testCRUDWithOnTheFlyUserAuth());
+        loop(() -> testCRUDWithOnTheFlyUserAuthWithClientSecret());
+        loop(() -> testCRUDWithOnTheFlyUserAuthWithSignedJwtClient());
+        loop(() -> testCRUDWithOnTheFlyServiceAccountWithClientSecret());
+        loop(() -> testCRUDWithOnTheFlyServiceAccountWithSignedJwtClient());
+        loop(() -> testCreateDeleteWithInitialAndRegistrationTokens());
+        loop(() -> testCreateDeleteWithInitialAndRegistrationTokensNoConfig());
+        loop(() -> testCreateWithAllowedHostsWithoutAuthenticationNoConfig());
+        loop(() -> testCreateWithAllowedHostsWithoutAuthentication());
+
+    }
+
+    private void loop(Testable t) throws Exception {
+        for (int i = 0; i < loopCount; i++) {
+            t.test();
+        }
+    }
+
+    //@Test
     public void testNoArgs() {
         /*
          *  Test (sub)commands without any arguments
@@ -87,7 +118,7 @@ public class KcRegTest extends AbstractCliTest {
         Assert.assertEquals("stdout last line", "", lines.get(lines.size() - 1));
     }
 
-    @Test
+    //@Test
     public void testHelpGlobalOption() {
         /*
          *  Test --help for all commands
@@ -162,7 +193,7 @@ public class KcRegTest extends AbstractCliTest {
 
     }
 
-    @Test
+    //@Test
     public void testBadCommand() {
         /*
          *  Test most basic execution with non-existent command
@@ -173,7 +204,7 @@ public class KcRegTest extends AbstractCliTest {
         Assert.assertEquals("stderr first line", "Unknown command: nonexistent", exe.stderrLines().get(0));
     }
 
-    @Test
+    //@Test
     public void testBadOptionInPlaceOfCommand() {
         /*
          *  Test most basic execution with non-existent option
@@ -184,7 +215,7 @@ public class KcRegTest extends AbstractCliTest {
         Assert.assertEquals("stderr first line", "Unknown command: --nonexistent", exe.stderrLines().get(0));
     }
 
-    @Test
+    //@Test
     public void testBadOption() {
         /*
          *  Test sub-command execution with non-existent option
@@ -328,7 +359,7 @@ public class KcRegTest extends AbstractCliTest {
         }
     }
 
-    @Test
+    //@Test
     public void testUserLoginWithCustomConfig() {
         /*
          *  Test user login using a custom config file
@@ -365,7 +396,7 @@ public class KcRegTest extends AbstractCliTest {
         }
     }
 
-    @Test
+    //@Test
     public void testCustomConfigLoginCreateDelete() throws IOException {
         /*
          *  Test user login, create, delete session using a custom config file
@@ -421,7 +452,7 @@ public class KcRegTest extends AbstractCliTest {
         }
     }
 
-    @Test
+    //@Test
     public void testCRUDWithOnTheFlyUserAuth() throws IOException {
         /*
          *  Test create, get, update, and delete using on-the-fly authentication - without using any config file.
@@ -431,7 +462,7 @@ public class KcRegTest extends AbstractCliTest {
                 "Logging into " + serverUrl + " as user user1 of realm test");
     }
 
-    @Test
+    //@Test
     public void testCRUDWithOnTheFlyUserAuthWithClientSecret() throws IOException {
         /*
          *  Test create, get, update, and delete using on-the-fly authentication - without using any config file.
@@ -469,7 +500,7 @@ public class KcRegTest extends AbstractCliTest {
                 "Logging into " + serverUrl + " as user user1 of realm test");
     }
 
-    @Test
+    //@Test
     public void testCRUDWithOnTheFlyUserAuthWithSignedJwtClient() throws IOException {
         /*
          *  Test create, get, update, and delete using on-the-fly authentication - without using any config file.
@@ -516,7 +547,7 @@ public class KcRegTest extends AbstractCliTest {
 
     }
 
-    @Test
+    //@Test
     public void testCRUDWithOnTheFlyServiceAccountWithClientSecret() throws IOException {
         /*
          *  Test create, get, update, and delete using on-the-fly authentication - without using any config file.
@@ -526,7 +557,7 @@ public class KcRegTest extends AbstractCliTest {
                 "Logging into " + serverUrl + " as service-account-reg-cli-secret of realm test");
     }
 
-    @Test
+    //@Test
     public void testCRUDWithOnTheFlyServiceAccountWithSignedJwtClient() throws IOException {
         /*
          *  Test create, get, update, and delete using on-the-fly authentication - without using any config file.
@@ -540,7 +571,7 @@ public class KcRegTest extends AbstractCliTest {
                 "Logging into " + serverUrl + " as service-account-reg-cli-jwt of realm test");
     }
 
-    @Test
+    //@Test
     public void testCreateDeleteWithInitialAndRegistrationTokens() throws IOException {
         /*
          *  Test create using initial client token, and subsequent delete using registration access token.
@@ -549,7 +580,7 @@ public class KcRegTest extends AbstractCliTest {
         testCreateDeleteWithInitialAndRegistrationTokens(true);
     }
 
-    @Test
+    //@Test
     public void testCreateDeleteWithInitialAndRegistrationTokensNoConfig() throws IOException {
         /*
          *  Test create using initial client token, and subsequent delete using registration access token.
@@ -597,13 +628,13 @@ public class KcRegTest extends AbstractCliTest {
         }
     }
 
-    @Test
+    //@Test
     public void testCreateWithAllowedHostsWithoutAuthenticationNoConfig() throws IOException {
 
         testCreateWithAllowedHostsWithoutAuthentication("test", false);
     }
 
-    @Test
+    //@Test
     public void testCreateWithAllowedHostsWithoutAuthentication() throws IOException {
 
         testCreateWithAllowedHostsWithoutAuthentication("test", true);
@@ -625,6 +656,11 @@ public class KcRegTest extends AbstractCliTest {
 
             Assert.assertEquals("clientId", "test-client", client.getClientId());
             Assert.assertNotNull("registrationAccessToken", client.getRegistrationAccessToken());
+
+            exe = execute("delete test-client " + (useConfig ? ("--config '" + configFile.getAbsolutePath()) + "'" : "--no-config")
+                    + " --server " + serverUrl + " --realm " + realm + " -t " + client.getRegistrationAccessToken());
+
+            assertExitCodeAndStreamSizes(exe, 0, 0, 0);
         }
     }
 

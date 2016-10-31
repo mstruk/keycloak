@@ -23,7 +23,7 @@ import static org.keycloak.testsuite.cli.KcRegExec.execute;
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
  */
-public class KcRegTest extends AbstractCliTest {
+public class KcRegTest extends AbstractRegCliTest {
 
     @Test
     public void testNoArgs() {

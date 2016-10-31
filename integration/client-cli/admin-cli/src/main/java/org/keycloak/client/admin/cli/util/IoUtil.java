@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.keycloak.client.registration.cli.util;
+package org.keycloak.client.admin.cli.util;
 
 import org.jboss.aesh.console.AeshConsoleBufferBuilder;
 import org.jboss.aesh.console.AeshInputProcessorBuilder;
@@ -23,7 +23,7 @@ import org.jboss.aesh.console.ConsoleBuffer;
 import org.jboss.aesh.console.InputProcessor;
 import org.jboss.aesh.console.Prompt;
 import org.jboss.aesh.console.command.invocation.CommandInvocation;
-import org.keycloak.client.registration.cli.aesh.Globals;
+import org.keycloak.client.admin.cli.aesh.Globals;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -51,7 +51,7 @@ import static java.nio.file.Files.createDirectories;
 import static java.nio.file.Files.createFile;
 import static java.nio.file.Files.isDirectory;
 import static java.nio.file.Files.isRegularFile;
-import static org.keycloak.client.registration.cli.util.OsUtil.OS_ARCH;
+import static org.keycloak.client.admin.cli.util.OsUtil.OS_ARCH;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -135,6 +135,26 @@ public class IoUtil {
             throw new RuntimeException("Failed to read stream", e);
         }
         return out.toString();
+    }
+
+    public static void copyStream(InputStream is, OutputStream os) {
+
+        byte [] buf = new byte[8192];
+
+        int rc;
+        try (InputStream input = is) {
+            while ((rc = input.read(buf)) != -1) {
+                os.write(buf, 0, rc);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to read/write a stream: ", e);
+        } finally {
+            try {
+                os.flush();
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to write a stream: ", e);
+            }
+        }
     }
 
     public static void ensureFile(Path path) throws IOException {

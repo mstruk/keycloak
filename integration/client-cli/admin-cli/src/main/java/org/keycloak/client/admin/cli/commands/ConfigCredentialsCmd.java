@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016 Red Hat, Inc. and/or its affiliates
+ * and other contributors as indicated by the @author tags.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.keycloak.client.admin.cli.commands;
 
 import org.jboss.aesh.cl.CommandDefinition;
@@ -189,17 +205,15 @@ public class ConfigCredentialsCmd extends AbstractAuthOptionsCmd implements Comm
     public static String usage() {
         StringWriter sb = new StringWriter();
         PrintWriter out = new PrintWriter(sb);
-        out.println("Usage: " + CMD + " config credentials --server SERVER_URL --realm REALM [ARGUMENTS]");
-        out.println("       " + CMD + " config credentials --server SERVER_URL --realm REALM --user USER [--password PASSWORD] [ARGUMENTS]");
+        out.println("Usage: " + CMD + " config credentials --server SERVER_URL --realm REALM --user USER [--password PASSWORD] [ARGUMENTS]");
         out.println("       " + CMD + " config credentials --server SERVER_URL --realm REALM --client CLIENT_ID [--secret SECRET] [ARGUMENTS]");
         out.println("       " + CMD + " config credentials --server SERVER_URL --realm REALM --client CLIENT_ID [--keystore KEYSTORE] [ARGUMENTS]");
         out.println();
         out.println("Command to establish an authenticated client session with the server. There are many authentication");
         out.println("options available, and it depends on server side client authentication configuration how client can or should authenticate.");
-        out.println("The information always required includes --server, and --realm. That is enough to establish unauthenticated session.");
-        out.println("If --client is not provided it defaults to 'admin-cli'. The authantication options / requirements depend on how this client is configured.");
+        out.println("The information always required includes --server, and --realm. Then, --user and / or --client need to be used to authenticate.");
+        out.println("If --client is not provided it defaults to 'admin-cli'. The authentication options / requirements depend on how this client is configured.");
         out.println();
-        out.println("If you have an account configured with the rights to manage clients then you can use username, and password to authenticate.");
         out.println("If confidential client authentication is also configured, you may have to specify a client id, and client credentials in addition to");
         out.println("user credentials. Client credentials are either a client secret, or a keystore information to use Signed JWT mechanism.");
         out.println("If only client credentials are provided, and no user credentials, then the service account is used for login.");

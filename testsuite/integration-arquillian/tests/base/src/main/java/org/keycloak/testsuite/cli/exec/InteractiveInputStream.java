@@ -81,20 +81,18 @@ class InteractiveInputStream extends InputStream {
 
     @Override
     public synchronized int read() throws IOException {
-        if (closed) {
-            return -1;
-        }
-
         // when input is available pass it on
         Byte current;
         try {
             consumer = Thread.currentThread();
 
             while ((current = queue.poll()) == null) {
-                wait();
+                // we don't check for closed before making sure
+                // that there is nothing more to read
                 if (closed) {
                     return -1;
                 }
+                wait();
             }
 
         } catch (InterruptedException e) {
@@ -108,7 +106,6 @@ class InteractiveInputStream extends InputStream {
     @Override
     public synchronized void close() {
         closed = true;
-        new RuntimeException("IIS || close").printStackTrace();
         if (consumer != null) {
             consumer.interrupt();
         }

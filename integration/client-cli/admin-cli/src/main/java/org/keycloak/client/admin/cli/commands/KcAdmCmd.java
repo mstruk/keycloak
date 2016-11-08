@@ -35,7 +35,7 @@ import static org.keycloak.client.admin.cli.util.OsUtil.PROMPT;
  */
 
 @GroupCommandDefinition(name = "kcreg", description = "COMMAND [ARGUMENTS]", groupCommands = {
-    HelpCmd.class, ConfigCmd.class} )
+    HelpCmd.class, ConfigCmd.class, RestCmd.class} )
 public class KcAdmCmd extends AbstractGlobalOptionsCmd {
 
     //@Arguments
@@ -83,10 +83,11 @@ public class KcAdmCmd extends AbstractGlobalOptionsCmd {
         out.println();
         out.println("Commands: ");
         out.println("  config        Set up credentials, and other configuration settings using the config file");
-        out.println("  users         Register a new client");
-        out.println("  roles         Get configuration of existing client in Keycloak or OIDC format, or adapter install configuration");
-        out.println("  update        Update a client configuration");
-        out.println("  delete        Delete a client");
+        out.println("  rest          Perform raw HTTP request controlling request method, headers, and body");
+        out.println("  create        Create new resource");
+        out.println("  update        Update a resource");
+        out.println("  get           Get a resource");
+        out.println("  delete        Delete a resource");
         out.println("  help          This help");
         out.println();
         out.println("Use '" + CMD + " help <command>' for more information about a given command.");

@@ -68,7 +68,7 @@ public class KcRegTest extends AbstractRegCliTest {
         exe = execute("config truststore");
         assertExitCodeAndStdErrSize(exe, 1, 0);
         Assert.assertTrue("help message returned", exe.stdoutLines().size() > 10);
-        Assert.assertEquals("help message", "Usage: " + CMD + " config truststore [TRUSTSTORE | --delete] [--trustpass PASSWOD] [ARGUMENTS]", exe.stdoutLines().get(0));
+        Assert.assertEquals("help message", "Usage: " + CMD + " config truststore [TRUSTSTORE | --delete] [--trustpass PASSWORD] [ARGUMENTS]", exe.stdoutLines().get(0));
 
         exe = execute("create");
         assertExitCodeAndStdErrSize(exe, 1, 0);
@@ -172,7 +172,7 @@ public class KcRegTest extends AbstractRegCliTest {
         exe = execute("config truststore --help");
         assertExitCodeAndStdErrSize(exe, 0, 0);
         Assert.assertEquals("stdout first line",
-                "Usage: " + CMD + " config truststore [TRUSTSTORE | --delete] [--trustpass PASSWOD] [ARGUMENTS]",
+                "Usage: " + CMD + " config truststore [TRUSTSTORE | --delete] [--trustpass PASSWORD] [ARGUMENTS]",
                 exe.stdoutLines().get(0));
 
     }

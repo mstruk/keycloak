@@ -120,9 +120,10 @@ public abstract class AbstractExec {
 
     public void waitCompletion() {
 
-        //if (stdin instanceof InteractiveInputStream) {
-        //    ((InteractiveInputStream) stdin).close();
-        //}
+        // This is necessary to make sure the process isn't stuck reading from stdin
+        if (stdin instanceof InteractiveInputStream) {
+            ((InteractiveInputStream) stdin).close();
+        }
         try {
             if (process.waitFor(waitTimeout, TimeUnit.MILLISECONDS)) {
                 exitCode = process.exitValue();

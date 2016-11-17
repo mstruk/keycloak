@@ -35,6 +35,8 @@ import static org.keycloak.client.admin.cli.util.ReflectionUtil.setAttributes;
  */
 public class ParseUtil {
 
+    public static final String ID_OPTION_WARN = "You're using what looks like an OPTION as ID: %s";
+
     public static String[] parseKeyVal(String keyval) {
         // we expect = as a separator
         int pos = keyval.indexOf("=");
@@ -81,7 +83,7 @@ public class ParseUtil {
         T result = ctx.getResult();
         try {
 
-            if (content == null) {
+            if (result == null) {
                 try {
                     result = constructor.newInstance();
                 } catch (Throwable e) {
@@ -106,5 +108,16 @@ public class ParseUtil {
         ctx.setContent(content);
         ctx.setResult(result);
         return ctx;
+    }
+
+    public static ResourceType checkResourceType(String option) {
+        switch (option) {
+            case "realm":
+            case "user":
+            case "role":
+                return ResourceType.valueOf(option.toUpperCase());
+            default:
+                throw new RuntimeException("Unsupported resource: " + option);
+        }
     }
 }

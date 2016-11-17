@@ -65,6 +65,22 @@ public class HelpCmd implements Command {
                         printOut(RestCmd.usage());
                         break;
                     }
+                    case "create": {
+                        printOut(CreateCmd.usage());
+                        break;
+                    }
+                    case "get": {
+                        printOut(GetCmd.usage());
+                        break;
+                    }
+                    case "update": {
+                        printOut(UpdateCmd.usage());
+                        break;
+                    }
+                    case "delete": {
+                        printOut(DeleteCmd.usage());
+                        break;
+                    }
                     default: {
                         throw new RuntimeException("Unknown command: " + args.get(0));
                     }

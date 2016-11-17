@@ -35,7 +35,7 @@ import static org.keycloak.client.admin.cli.util.OsUtil.PROMPT;
  */
 
 @GroupCommandDefinition(name = "kcreg", description = "COMMAND [ARGUMENTS]", groupCommands = {
-    HelpCmd.class, ConfigCmd.class, RestCmd.class, CreateCmd.class} )
+    HelpCmd.class, ConfigCmd.class, RestCmd.class, CreateCmd.class, GetCmd.class, UpdateCmd.class, DeleteCmd.class} )
 public class KcAdmCmd extends AbstractGlobalOptionsCmd {
 
     //@Arguments

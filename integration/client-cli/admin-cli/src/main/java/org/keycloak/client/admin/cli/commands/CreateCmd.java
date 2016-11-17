@@ -15,7 +15,6 @@ import org.keycloak.client.admin.cli.config.ConfigData;
 import org.keycloak.client.admin.cli.util.ResourceType;
 import org.keycloak.util.JsonSerialization;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.Iterator;
@@ -33,6 +32,7 @@ import static org.keycloak.client.admin.cli.util.OsUtil.CMD;
 import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
 import static org.keycloak.client.admin.cli.util.OsUtil.OS_ARCH;
 import static org.keycloak.client.admin.cli.util.OsUtil.PROMPT;
+import static org.keycloak.client.admin.cli.util.ParseUtil.checkResourceType;
 import static org.keycloak.client.admin.cli.util.ParseUtil.mergeAttributes;
 import static org.keycloak.client.admin.cli.util.ParseUtil.parseFileOrStdin;
 import static org.keycloak.client.admin.cli.util.ParseUtil.parseKeyVal;
@@ -75,23 +75,28 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
 
             processGlobalOptions();
 
-            if (args != null) {
-                Iterator<String> it = args.iterator();
-                while (it.hasNext()) {
-                    String option = it.next();
-                    switch (option) {
-                        case "-s":
-                        case "--set": {
-                            if (!it.hasNext()) {
-                                throw new IllegalArgumentException("Option " + option + " requires a value");
-                            }
-                            String[] keyVal = parseKeyVal(it.next());
-                            attrs.add(new AttributeOperation(SET, keyVal[0], keyVal[1]));
-                            break;
+            if (args == null || args.isEmpty()) {
+                throw new IllegalArgumentException("TYPE not specified");
+            }
+
+            Iterator<String> it = args.iterator();
+
+            resourceType = checkResourceType(it.next());
+
+            while (it.hasNext()) {
+                String option = it.next();
+                switch (option) {
+                    case "-s":
+                    case "--set": {
+                        if (!it.hasNext()) {
+                            throw new IllegalArgumentException("Option " + option + " requires a value");
                         }
-                        default: {
-                            resourceType = checkResourceType(option);
-                        }
+                        String[] keyVal = parseKeyVal(it.next());
+                        attrs.add(new AttributeOperation(SET, keyVal[0], keyVal[1]));
+                        break;
+                    }
+                    default: {
+                        throw new IllegalArgumentException("Invalid option: " + option);
                     }
                 }
             }
@@ -114,7 +119,7 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
                 try {
                     ctx = mergeAttributes(ctx, resourceType.getType().getConstructor(null), attrs);
                 } catch (NoSuchMethodException e) {
-                    throw new RuntimeException("Failed to instanciate representation object", e);
+                    throw new RuntimeException("Failed to instantiate representation object", e);
                 }
             }
 
@@ -156,17 +161,6 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
             throw new IllegalArgumentException(e.getMessage() + suggestHelp(), e);
         } finally {
             commandInvocation.stop();
-        }
-    }
-
-    private ResourceType checkResourceType(String option) {
-        switch (option) {
-            case "realm":
-            case "user":
-            case "role":
-                return ResourceType.valueOf(option.toUpperCase());
-            default:
-                throw new RuntimeException("Unsupported resource: " + option);
         }
     }
 

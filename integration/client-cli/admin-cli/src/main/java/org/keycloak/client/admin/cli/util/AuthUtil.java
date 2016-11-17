@@ -96,10 +96,8 @@ public class AuthUtil {
                 });
                 return token.getToken();
 
-            } catch (UnsupportedEncodingException e) {
-                throw new RuntimeException("Unexpected error", e);
-            } catch (IOException e) {
-                throw new RuntimeException("Failed to read Refresh Token response", e);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to refresh access token - " + e.getMessage(), e);
             }
         }
 

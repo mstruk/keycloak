@@ -82,6 +82,9 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
     @Option(shortName = 'r', name = "return-head", description = "Print response headers", hasValue = false)
     protected boolean printHeaders ;
 
+    @Option(shortName = 'i', name = "id", description = "After creation print created resource id to standard output", hasValue = false)
+    protected boolean returnId = false;
+
     @Arguments
     private List<String> args;
 
@@ -200,36 +203,45 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
         response.checkSuccess();
 
         AccessibleBufferOutputStream abos = new AccessibleBufferOutputStream(System.out);
-        if (response.getBody() != null) {
-            if (printHeaders) {
-                printOut("");
+        if (response.getBody() == null) {
+            throw new RuntimeException("Internal error - response body should never be null");
+        }
+
+        if (printHeaders) {
+            printOut("");
+        }
+
+
+        String location = response.getHeader("Location");
+        if (returnId && location != null) {
+            int last = location.lastIndexOf("/");
+            if (last != -1) {
+                printOut(location.substring(last + 1));
             }
+        } else if (pretty || returnFields != null) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            copyStream(response.getBody(), buffer);
 
-            if (pretty || returnFields != null) {
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                copyStream(response.getBody(), buffer);
-
-                ObjectMapper mapper = new ObjectMapper();
-                mapper.enable(SerializationFeature.INDENT_OUTPUT);
-                mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-                try {
-                    JsonNode rootNode = mapper.readValue(buffer.toByteArray(), JsonNode.class);
-                    if (returnFields != null) {
-                        rootNode = applyFieldFilter(mapper, rootNode, returnFields);
-                    }
-                    // now pretty print it to output
-                    mapper.writeValue(abos, rootNode);
-                } catch (Exception ignored) {
-                    copyStream(new ByteArrayInputStream(buffer.toByteArray()), abos);
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.enable(SerializationFeature.INDENT_OUTPUT);
+            mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+            try {
+                JsonNode rootNode = mapper.readValue(buffer.toByteArray(), JsonNode.class);
+                if (returnFields != null) {
+                    rootNode = applyFieldFilter(mapper, rootNode, returnFields);
                 }
-            } else {
-                copyStream(response.getBody(), abos);
+                // now pretty print it to output
+                mapper.writeValue(abos, rootNode);
+            } catch (Exception ignored) {
+                copyStream(new ByteArrayInputStream(buffer.toByteArray()), abos);
             }
+        } else {
+            copyStream(response.getBody(), abos);
+        }
 
-            int lastByte = abos.getLastByte();
-            if (lastByte != 13 && lastByte != 10) {
-                printErr("");
-            }
+        int lastByte = abos.getLastByte();
+        if (lastByte != -1 && lastByte != 13 && lastByte != 10) {
+            printErr("");
         }
 
         return CommandResult.SUCCESS;

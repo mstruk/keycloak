@@ -16,8 +16,12 @@
  */
 package org.keycloak.client.admin.cli.util;
 
+import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.List;
+
+import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -38,6 +42,12 @@ public class HeadersBody {
 
     public InputStream getBody() {
         return body;
+    }
+
+    public String bodyString() {
+        ByteArrayOutputStream os = new ByteArrayOutputStream();
+        copyStream(getBody(), os);
+        return new String(os.toByteArray(), Charset.forName(getContentCharset()));
     }
 
     public String getHeader(String name) {

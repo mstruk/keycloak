@@ -38,6 +38,7 @@ import org.apache.http.ssl.SSLContexts;
 import org.keycloak.util.JsonSerialization;
 
 import javax.net.ssl.SSLContext;
+import javax.ws.rs.core.Response;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,6 +51,8 @@ import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
+import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -136,6 +139,13 @@ public class HttpUtil {
         InputStream responseStream = null;
         if (res.getEntity() != null) {
             responseStream = res.getEntity().getContent();
+        } else {
+            responseStream = new InputStream() {
+                @Override
+                public int read () throws IOException {
+                    return -1;
+                }
+            };
         }
 
         List<Pair> headers = new ArrayList<>();
@@ -231,5 +241,36 @@ public class HttpUtil {
                 .loadTrustMaterial(file, password == null ? null : password.toCharArray())
                 .build();
         sslsf = new SSLConnectionSocketFactory(theContext);
+    }
+
+    public static String extractIdFromLocation(String location) {
+        int last = location.lastIndexOf("/");
+        if (last != -1) {
+            return location.substring(last + 1);
+        }
+        return null;
+    }
+
+    public static void checkStatusCreated(Response response) {
+        checkStatus(response, Response.Status.CREATED.getStatusCode());
+    }
+
+    public static void checkStatusNoContent(Response response) {
+        checkStatus(response, Response.Status.NO_CONTENT.getStatusCode());
+    }
+
+    public static void checkStatus(Response response, int expected) {
+        if (response.getStatus() != expected) {
+            Object body = response.getEntity();
+            String err = "Error: " + response.getStatus() + " " + response.getStatusInfo();
+            if (body instanceof Map) {
+                Map<String, String> msg = (Map<String, String>) body;
+                String errmsg = msg.get("error_description");
+                if (errmsg != null) {
+                    err += " - " + errmsg + "[" + msg.get("error") + "]";
+                }
+            }
+            throw new RuntimeException(err);
+        }
     }
 }

@@ -17,6 +17,18 @@
 
 package org.keycloak.client.admin.cli.util;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import org.keycloak.client.admin.cli.common.AttributeOperation;
+import org.keycloak.client.admin.cli.common.CmdStdinContext;
+import org.keycloak.util.JsonSerialization;
+
+import java.io.IOException;
+import java.lang.reflect.Constructor;
+import java.util.List;
+
+import static org.keycloak.client.admin.cli.util.IoUtil.readFileOrStdin;
+import static org.keycloak.client.admin.cli.util.ReflectionUtil.setAttributes;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -35,5 +47,64 @@ public class ParseUtil {
         parsed[1] = keyval.substring(pos+1);
 
         return parsed;
+    }
+
+    public static <T> CmdStdinContext<T> parseFileOrStdin(String file, Class<T> type) {
+
+        String content = readFileOrStdin(file).trim();
+        T result = null;
+
+        if (content.length() == 0) {
+            throw new RuntimeException("Document provided by --file option is empty");
+        }
+
+        try {
+            result = JsonSerialization.readValue(content, type);
+        } catch (JsonParseException e) {
+            throw new RuntimeException("Not a valid JSON document - " + e.getMessage(), e);
+        } catch (UnrecognizedPropertyException e) {
+            throw new RuntimeException("Attribute '" + e.getPropertyName() + "' not supported on document type '" + type.getName() + "'", e);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read the input document as JSON: " + e.getMessage(), e);
+        } catch (Exception e) {
+            throw new RuntimeException("Not a valid JSON document", e);
+        }
+
+        CmdStdinContext ctx = new CmdStdinContext();
+        ctx.setContent(content);
+        ctx.setResult(result);
+        return ctx;
+    }
+
+    public static <T> CmdStdinContext<T> mergeAttributes(CmdStdinContext<T> ctx, Constructor<T> constructor, List<AttributeOperation> attrs) {
+        String content = ctx.getContent();
+        T result = ctx.getResult();
+        try {
+
+            if (content == null) {
+                try {
+                    result = constructor.newInstance();
+                } catch (Throwable e) {
+                    throw new RuntimeException("Failed to instantiate object: " + e.getMessage(), e);
+                }
+            }
+
+            if (result != null) {
+                try {
+                    setAttributes(result, attrs);
+                } catch (AttributeException e) {
+                    throw new RuntimeException("Failed to set attribute '" + e.getAttributeName() + "' on document type '" + result.getClass().getName() + "'", e);
+                }
+                content = JsonSerialization.writeValueAsString(result);
+            } else {
+                throw new RuntimeException("Setting attributes is not supported for type: " + result.getClass().getName());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to merge set attributes with configuration from file", e);
+        }
+
+        ctx.setContent(content);
+        ctx.setResult(result);
+        return ctx;
     }
 }

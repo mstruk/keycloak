@@ -14,20 +14,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.keycloak.client.admin.cli.aesh;
 
-import org.keycloak.admin.client.Keycloak;
-
-import java.util.List;
+package org.keycloak.client.admin.cli.common;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
  */
-public class Globals {
+public class CmdStdinContext<T> {
 
-    public static boolean dumpTrace = false;
+    private T result;
+    private String content;
 
-    public static ValveInputStream stdin;
+    public CmdStdinContext() {}
 
-    public static List<String> args;
+    public T getResult() {
+        return result;
+    }
+
+    public void setResult(T result) {
+        this.result = result;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
 }

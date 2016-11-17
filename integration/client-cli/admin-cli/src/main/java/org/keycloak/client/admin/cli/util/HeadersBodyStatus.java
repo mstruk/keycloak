@@ -18,13 +18,9 @@ package org.keycloak.client.admin.cli.util;
 
 import org.keycloak.util.JsonSerialization;
 
-import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Map;
-
-import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -42,12 +38,6 @@ public class HeadersBodyStatus extends HeadersBody {
         return status;
     }
 
-    public String bodyString() {
-        ByteArrayOutputStream os = new ByteArrayOutputStream();
-        copyStream(getBody(), os);
-        return new String(os.toByteArray(), Charset.forName(getContentCharset()));
-    }
-
     private String getStatusCodeAndReason() {
         return getStatus().substring(9);
     }
@@ -55,17 +45,22 @@ public class HeadersBodyStatus extends HeadersBody {
     public void checkSuccess() {
         int code = Integer.valueOf(status.split(" ")[1]);
         if (code < 200 || code >= 300) {
+            String content = bodyString();
             Map<String, String> error = null;
             try {
-                error = JsonSerialization.readValue(getBody(), Map.class);
+                error = JsonSerialization.readValue(content, Map.class);
             } catch (Exception ignored) {
             }
 
             String message = null;
             if (error != null) {
-                message = error.get("error_description") + " [" + error.get("error") + "]";
+                String description = error.get("error_description");
+                String err = error.get("error");
+                String msg = error.get("errorMessage");
+                message = msg != null ? msg : err != null ? (description + " ["+ error.get("error") + "]") : null;
             }
-            throw new RuntimeException("Error status: " + message != null ? message : getStatusCodeAndReason());
+            throw new RuntimeException("Error: " + getStatusCodeAndReason() + (message != null ? " - " + message : ""),
+                    new RuntimeException(content));
         }
     }
 }

@@ -8,19 +8,27 @@ import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
  */
 public enum ResourceType {
 
-    REALM(RealmRepresentation.class),
-    USER(UserRepresentation.class),
-    ROLE(RoleRepresentation.class);
+    REALMS(RealmRepresentation.class, true),
+    REALM(RealmRepresentation.class, false),
+    USERS(UserRepresentation.class, true),
+    USER(UserRepresentation.class, false),
+    ROLES(RoleRepresentation.class, true),
+    ROLE(RoleRepresentation.class, false);
 
     private Class clazz;
+    private boolean collection;
 
-    private <T> ResourceType(Class<T> c) {
+    private <T> ResourceType(Class<T> c, boolean collection) {
         this.clazz = c;
+        this.collection = collection;
     }
 
     public Class getType() {
@@ -51,6 +59,18 @@ public enum ResourceType {
         }
     }
 
+    public List<?> getMany(Keycloak client, String realm, int offset, int limit, Map<String, String> filter) {
+        if (RealmRepresentation.class == clazz) {
+            return RealmOperations.getAll(client);
+        } else if (UserRepresentation.class == clazz) {
+            return UserOperations.getAllFiltered(client, realm, offset, limit, filter);
+        } else if (RoleRepresentation.class == clazz) {
+            return RoleOperations.getAll(client, realm);
+        } else {
+            throw new RuntimeException("Unsupported type: " + clazz);
+        }
+    }
+
     public void update(Keycloak client, String realm, Object representation) {
         if (RealmRepresentation.class == clazz) {
             RealmOperations.update(client, (RealmRepresentation) representation);
@@ -73,5 +93,9 @@ public enum ResourceType {
         } else {
             throw new RuntimeException("Unsupported type: " + clazz);
         }
+    }
+
+    public boolean isCollectionType() {
+        return collection;
     }
 }

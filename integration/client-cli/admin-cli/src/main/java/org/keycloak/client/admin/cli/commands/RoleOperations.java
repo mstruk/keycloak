@@ -3,6 +3,8 @@ package org.keycloak.client.admin.cli.commands;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RoleRepresentation;
 
+import java.util.List;
+
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
  */
@@ -17,10 +19,11 @@ public class RoleOperations {
         return client.realm(realm).roles().get(name).toRepresentation();
     }
 
+    public static List<RoleRepresentation> getAll(Keycloak client, String realm) {
+        return client.realm(realm).roles().list();
+    }
+
     public static void update(Keycloak client, String realm, RoleRepresentation role) {
-        //if (role.getId() == null) {
-        //    throw new RuntimeException("Role has no id set");
-        //}
         client.realm(realm).roles().get(role.getName()).update(role);
     }
 

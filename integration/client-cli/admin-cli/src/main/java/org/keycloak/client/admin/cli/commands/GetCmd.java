@@ -17,6 +17,10 @@
 
 package org.keycloak.client.admin.cli.commands;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import org.jboss.aesh.cl.Arguments;
 import org.jboss.aesh.cl.CommandDefinition;
 import org.jboss.aesh.cl.Option;
@@ -26,24 +30,34 @@ import org.jboss.aesh.console.command.invocation.CommandInvocation;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.config.ConfigData;
+import org.keycloak.client.admin.cli.util.OutputFormat;
 import org.keycloak.client.admin.cli.util.ParseUtil;
 import org.keycloak.client.admin.cli.util.ResourceType;
+import org.keycloak.client.admin.cli.util.ReturnFields;
 import org.keycloak.util.JsonSerialization;
 
+import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.DEFAULT_CONFIG_FILE_STRING;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.credentialsAvailable;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
+import static org.keycloak.client.admin.cli.util.FilterUtil.copyFilteredObject;
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 import static org.keycloak.client.admin.cli.util.IoUtil.warnfErr;
 import static org.keycloak.client.admin.cli.util.OsUtil.CMD;
 import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
 import static org.keycloak.client.admin.cli.util.OsUtil.PROMPT;
+import static org.keycloak.client.admin.cli.util.OutputUtil.convertToJsonNode;
+import static org.keycloak.client.admin.cli.util.OutputUtil.printAsCsv;
 import static org.keycloak.client.admin.cli.util.ParseUtil.checkResourceType;
+import static org.keycloak.client.admin.cli.util.ParseUtil.parseKeyVal;
 
 
 /**
@@ -54,6 +68,21 @@ public class GetCmd extends AbstractAuthOptionsCmd {
 
     @Option(shortName = 'c', name = "compressed", description = "Print full stack trace when exiting with error", hasValue = false)
     private boolean compressed = false;
+
+    //@Option(shortName = 'f', name = "filter", description = "Filter resource list by specified fields and their values", hasValue = false)
+    //private List<String> queryFilter;
+
+    @Option(name = "fields", description = "A pattern specifying which attributes of JSON response to actually display as result", hasValue = true)
+    protected String fields;
+
+    @Option(shortName = 'o', name = "offset", description = "Number of results from beginning of resultset to skip", hasValue = true)
+    private int offset = 0;
+
+    @Option(shortName = 'l', name = "limit", description = "Maksimum number of results to return", hasValue = true, defaultValue = "1000")
+    private int limit = 1000;
+
+    @Option(name = "format", description = "Output format - one of: json, csv", hasValue = true, defaultValue = "json")
+    protected String format;
 
     @Arguments
     private List<String> args;
@@ -73,20 +102,59 @@ public class GetCmd extends AbstractAuthOptionsCmd {
             if (args == null || args.isEmpty()) {
                 throw new IllegalArgumentException("TYPE not specified");
             }
-            resourceType = checkResourceType(args.get(0));
 
-            if (args.size() < 2) {
-                throw new IllegalArgumentException("Resource ID not specified");
+            Iterator<String> it = args.iterator();
+            resourceType = checkResourceType(it.next());
+
+            String id = null;
+            if (!resourceType.isCollectionType()) {
+                if (!it.hasNext()) {
+                    throw new IllegalArgumentException("Resource ID not specified");
+                }
+                id = it.next();
+
+                if (id.startsWith("-")) {
+                    warnfErr(ParseUtil.ID_OPTION_WARN, id);
+                }
             }
-            String id = args.get(1);
 
-            if (args.size() > 2) {
-                throw new IllegalArgumentException("Invalid option: " + args.get(2));
+            OutputFormat outputFormat;
+            try {
+                outputFormat = OutputFormat.valueOf(format.toUpperCase());
+            } catch (Exception e) {
+                throw new RuntimeException("Unsupported output format: " + format);
             }
 
+            Map<String, String> filter = new HashMap<>();
 
-            if (id.startsWith("-")) {
-                warnfErr(ParseUtil.ID_OPTION_WARN, id);
+            while (it.hasNext()) {
+                String option = it.next();
+                switch (option) {
+                    case "-f":
+                    case "--filter": {
+                        if (!it.hasNext()) {
+                            throw new IllegalArgumentException("Option " + option + " requires a value");
+                        }
+                        String arg = it.next();
+                        String[] keyVal = null;
+                        if (arg.indexOf("=") == -1) {
+                            keyVal = new String[] {"", arg};
+                        } else {
+                            keyVal = parseKeyVal(arg);
+                        }
+                        filter.put(keyVal[0], keyVal[1]);
+                        break;
+                    }
+                    default: {
+                        throw new IllegalArgumentException("Invalid option: " + option);
+                    }
+                }
+            }
+
+            ReturnFields returnFields = null;
+
+            if (fields != null) {
+                returnFields = new ReturnFields(fields);
             }
 
             ConfigData config = loadConfig();
@@ -116,14 +184,32 @@ public class GetCmd extends AbstractAuthOptionsCmd {
                     .authorization(auth)
                     .build();
 
-            Object result = resourceType.get(client, realm, id);
+            Object result;
+            if (resourceType.isCollectionType()) {
+                result = resourceType.getMany(client, realm, offset, limit, filter);
+            } else {
+                result = resourceType.get(client, realm, id);
+            }
+
+            if (returnFields != null) {
+                try {
+                    result = copyFilteredObject(result, returnFields);
+                } catch (Exception e) {
+                    throw new RuntimeException("Failed to filter response", e);
+                }
+            }
 
             try {
-                if (compressed) {
-                    printOut(JsonSerialization.writeValueAsString(result));
+                if (outputFormat == OutputFormat.JSON) {
+                    if (compressed) {
+                        printOut(JsonSerialization.writeValueAsString(result));
+                    } else {
+                        printOut(JsonSerialization.writeValueAsPrettyString(result));
+                    }
                 } else {
-                    printOut(JsonSerialization.writeValueAsPrettyString(result));
+                    printAsCsv(result, returnFields);
                 }
+
             } catch (Exception e) {
                 throw new RuntimeException("Failed to print result as JSON " + result);
             }

@@ -16,8 +16,6 @@
  */
 package org.keycloak.client.admin.cli.aesh;
 
-import org.keycloak.admin.client.Keycloak;
-
 import java.util.List;
 
 /**

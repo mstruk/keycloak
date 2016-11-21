@@ -20,8 +20,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jboss.aesh.cl.Arguments;
 import org.jboss.aesh.cl.CommandDefinition;
 import org.jboss.aesh.cl.Option;
@@ -31,6 +29,7 @@ import org.jboss.aesh.console.command.CommandResult;
 import org.jboss.aesh.console.command.invocation.CommandInvocation;
 import org.keycloak.client.admin.cli.config.ConfigData;
 import org.keycloak.client.admin.cli.util.AccessibleBufferOutputStream;
+import org.keycloak.client.admin.cli.util.FilterUtil;
 import org.keycloak.client.admin.cli.util.HeadersBody;
 import org.keycloak.client.admin.cli.util.HeadersBodyStatus;
 import org.keycloak.client.admin.cli.util.HttpUtil;
@@ -79,7 +78,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
     @Option(name = "fields", description = "A pattern specifying which attributes of JSON response body to actually display as result - causes mismatch with Content-Length header", hasValue = true)
     protected String fields;
 
-    @Option(shortName = 'r', name = "return-head", description = "Print response headers", hasValue = false)
+    @Option(shortName = 'r', name = "response-head", description = "Print response headers", hasValue = false)
     protected boolean printHeaders ;
 
     @Option(shortName = 'i', name = "id", description = "After creation print created resource id to standard output", hasValue = false)
@@ -249,29 +248,11 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
 
     private JsonNode applyFieldFilter(ObjectMapper mapper, JsonNode rootNode, ReturnFields returnFields) {
         // construct new JsonNode that satisfies filtering specified by returnFields
-        return copyFilteredObject(mapper, rootNode, returnFields);
-    }
-
-    private JsonNode copyFilteredObject(ObjectMapper mapper, JsonNode node, ReturnFields returnFields) {
-        JsonNode r = node;
-        if (node.isArray()) {
-            ArrayNode ar = mapper.createArrayNode();
-            for (JsonNode item: node) {
-                ar.add(copyFilteredObject(mapper, item, returnFields));
-            }
-            r = ar;
-        } else if (node.isObject()){
-            r = mapper.createObjectNode();
-            Iterator<String> fieldNames = node.fieldNames();
-            while (fieldNames.hasNext()) {
-                String name = fieldNames.next();
-                if (returnFields.included(name)) {
-                    JsonNode value = copyFilteredObject(mapper, node.get(name), returnFields.child(name));
-                    ((ObjectNode) r).set(name, value);
-                }
-            }
+        try {
+            return FilterUtil.copyFilteredObject(rootNode, returnFields);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to apply fields filter", e);
         }
-        return r;
     }
 
     private void requireValue(Iterator<String> it, String option) {

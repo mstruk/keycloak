@@ -115,6 +115,9 @@ public class ParseUtil {
             case "realm":
             case "user":
             case "role":
+            case "realms":
+            case "users":
+            case "roles":
                 return ResourceType.valueOf(option.toUpperCase());
             default:
                 throw new RuntimeException("Unsupported resource: " + option);

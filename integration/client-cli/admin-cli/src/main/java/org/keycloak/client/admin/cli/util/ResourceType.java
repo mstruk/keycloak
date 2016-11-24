@@ -1,9 +1,9 @@
 package org.keycloak.client.admin.cli.util;
 
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.client.admin.cli.commands.RealmOperations;
-import org.keycloak.client.admin.cli.commands.RoleOperations;
-import org.keycloak.client.admin.cli.commands.UserOperations;
+import org.keycloak.client.admin.cli.operations.RealmOperations;
+import org.keycloak.client.admin.cli.operations.RoleOperations;
+import org.keycloak.client.admin.cli.operations.UserOperations;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -21,7 +21,8 @@ public enum ResourceType {
     USERS(UserRepresentation.class, true),
     USER(UserRepresentation.class, false),
     ROLES(RoleRepresentation.class, true),
-    ROLE(RoleRepresentation.class, false);
+    ROLE(RoleRepresentation.class, false),
+    AVAILABLE_ROLES(RoleRepresentation.class, true);
 
     private Class clazz;
     private boolean collection;
@@ -43,7 +44,7 @@ public enum ResourceType {
         } else if (RoleRepresentation.class == clazz) {
             return RoleOperations.create(client, realm, (RoleRepresentation) representation);
         } else {
-            throw new RuntimeException("Unsupported type: " + clazz);
+            throw new RuntimeException("Unsupported type: " + getTypeName());
         }
     }
 
@@ -55,7 +56,7 @@ public enum ResourceType {
         } else if (RoleRepresentation.class == clazz) {
             return RoleOperations.get(client, realm, id);
         } else {
-            throw new RuntimeException("Unsupported type: " + clazz);
+            throw new RuntimeException("Unsupported type: " + getTypeName());
         }
     }
 
@@ -67,7 +68,7 @@ public enum ResourceType {
         } else if (RoleRepresentation.class == clazz) {
             return RoleOperations.getAll(client, realm);
         } else {
-            throw new RuntimeException("Unsupported type: " + clazz);
+            throw new RuntimeException("Unsupported type: " + getTypeName());
         }
     }
 
@@ -79,7 +80,7 @@ public enum ResourceType {
         } else if (RoleRepresentation.class == clazz) {
             RoleOperations.update(client, realm, (RoleRepresentation) representation);
         } else {
-            throw new RuntimeException("Unsupported type: " + clazz);
+            throw new RuntimeException("Unsupported type: " + getTypeName());
         }
     }
 
@@ -91,11 +92,19 @@ public enum ResourceType {
         } else if (RoleRepresentation.class == clazz) {
             RoleOperations.delete(client, realm, id);
         } else {
-            throw new RuntimeException("Unsupported type: " + clazz);
+            throw new RuntimeException("Unsupported type: " + getTypeName());
         }
     }
 
     public boolean isCollectionType() {
         return collection;
+    }
+
+    public String getTypeName() {
+        return toString().toLowerCase().replace("_", "-");
+    }
+
+    public static ResourceType fromName(String option) {
+        return valueOf(option.toUpperCase().replace("-", "_"));
     }
 }

@@ -1,8 +1,9 @@
-package org.keycloak.client.admin.cli.commands;
+package org.keycloak.client.admin.cli.operations;
 
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.client.admin.cli.util.HttpUtil;
 import org.keycloak.representations.idm.RealmRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
 import javax.ws.rs.core.Response;
@@ -79,5 +80,13 @@ public class UserOperations {
     public static void delete(Keycloak client, String realm, String id) {
         Response response = client.realm(realm).users().delete(id);
         HttpUtil.checkStatusNoContent(response);
+    }
+
+    public static void addRoles(Keycloak client, String realm, String id, List<RoleRepresentation> roles) {
+        client.realm(realm).users().get(id).roles().realmLevel().add(roles);
+    }
+
+    public static void addClientRoles(Keycloak client, String realm, String id, String idOfClient, List<RoleRepresentation> roles) {
+        client.realm(realm).users().get(id).roles().clientLevel(idOfClient).add(roles);
     }
 }

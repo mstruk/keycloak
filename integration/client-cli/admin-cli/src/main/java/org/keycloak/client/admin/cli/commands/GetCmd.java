@@ -17,10 +17,6 @@
 
 package org.keycloak.client.admin.cli.commands;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import org.jboss.aesh.cl.Arguments;
 import org.jboss.aesh.cl.CommandDefinition;
 import org.jboss.aesh.cl.Option;
@@ -36,7 +32,6 @@ import org.keycloak.client.admin.cli.util.ResourceType;
 import org.keycloak.client.admin.cli.util.ReturnFields;
 import org.keycloak.util.JsonSerialization;
 
-import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
@@ -54,7 +49,6 @@ import static org.keycloak.client.admin.cli.util.IoUtil.warnfErr;
 import static org.keycloak.client.admin.cli.util.OsUtil.CMD;
 import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
 import static org.keycloak.client.admin.cli.util.OsUtil.PROMPT;
-import static org.keycloak.client.admin.cli.util.OutputUtil.convertToJsonNode;
 import static org.keycloak.client.admin.cli.util.OutputUtil.printAsCsv;
 import static org.keycloak.client.admin.cli.util.ParseUtil.checkResourceType;
 import static org.keycloak.client.admin.cli.util.ParseUtil.parseKeyVal;
@@ -136,7 +130,7 @@ public class GetCmd extends AbstractAuthOptionsCmd {
                             throw new IllegalArgumentException("Option " + option + " requires a value");
                         }
                         String arg = it.next();
-                        String[] keyVal = null;
+                        String[] keyVal;
                         if (arg.indexOf("=") == -1) {
                             keyVal = new String[] {"", arg};
                         } else {

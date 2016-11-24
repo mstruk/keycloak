@@ -1,4 +1,4 @@
-package org.keycloak.client.admin.cli.commands;
+package org.keycloak.client.admin.cli.operations;
 
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmsResource;

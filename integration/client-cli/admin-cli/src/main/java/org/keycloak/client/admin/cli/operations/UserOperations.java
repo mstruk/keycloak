@@ -7,6 +7,7 @@ import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
 import javax.ws.rs.core.Response;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -29,6 +30,15 @@ public class UserOperations {
         return client.realm(realm).users().search(null, offset, limit);
     }
 
+    public static UserRepresentation getByUsername(Keycloak client, String realm, String username) {
+        Map<String, String> filter = new HashMap<>();
+        filter.put("username", username);
+        List<UserRepresentation> result = getAllFiltered(client, realm, 0, 2, filter);
+        if (result.size() > 1) {
+            throw new RuntimeException("More that one user found for username: " + username);
+        }
+        return result.size() > 0 ? result.get(0) : null;
+    }
     public static List<UserRepresentation> getAllFiltered(Keycloak client, String realm, int offset, int limit, Map<String, String> filter) {
         String username = null;
         String firstName = null;

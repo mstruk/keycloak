@@ -12,7 +12,8 @@ import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.common.CmdStdinContext;
 import org.keycloak.client.admin.cli.config.ConfigData;
-import org.keycloak.client.admin.cli.util.ResourceType;
+import org.keycloak.client.admin.cli.operations.ResourceHandler;
+import org.keycloak.client.admin.cli.operations.ResourceType;
 import org.keycloak.util.JsonSerialization;
 
 import java.io.PrintWriter;
@@ -82,6 +83,7 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
             Iterator<String> it = args.iterator();
 
             resourceType = checkResourceType(it.next());
+            ResourceHandler handler = resourceType.newHandler();
 
             while (it.hasNext()) {
                 String option = it.next();
@@ -150,9 +152,9 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
                     .authorization(auth)
                     .build();
 
-            String id = resourceType.create(client, realm, ctx.getResult());
+            String id = handler.create(client, realm, ctx.getResult());
 
-            outputResult(resourceType, client, realm, id);
+            outputResult(handler, client, realm, id);
 
 
             return CommandResult.SUCCESS;
@@ -164,11 +166,11 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
         }
     }
 
-    private void outputResult(ResourceType rtype, Keycloak client, String realm, String id) {
+    private void outputResult(ResourceHandler handler, Keycloak client, String realm, String id) {
         if (returnId) {
             printOut(id);
         } else if (outputResult) {
-            Object result = rtype.get(client, realm, id);
+            Object result = handler.get(client, realm, id);
             try {
                 if (compressed) {
                     printOut(JsonSerialization.writeValueAsString(result));
@@ -179,7 +181,7 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
                 throw new RuntimeException("Failed to print result as JSON " + result);
             }
         } else {
-            printErr("Created new " + rtype.name().toLowerCase() + " with id '" + id + "'");
+            printErr("Created new " + handler.getType().toTypeName() + " with id '" + id + "'");
         }
     }
 

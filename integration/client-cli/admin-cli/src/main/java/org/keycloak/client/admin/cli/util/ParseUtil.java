@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.common.CmdStdinContext;
+import org.keycloak.client.admin.cli.operations.ResourceType;
 import org.keycloak.util.JsonSerialization;
 
 import java.io.IOException;
@@ -111,17 +112,19 @@ public class ParseUtil {
     }
 
     public static ResourceType checkResourceType(String option) {
-        switch (option) {
-            case "realm":
-            case "user":
-            case "role":
-            case "realms":
-            case "users":
-            case "roles":
-            case "available-roles":
-                return ResourceType.fromName(option);
-            default:
-                throw new RuntimeException("Unsupported resource: " + option);
-        }
+        //switch (option) {
+        //    case "realm":
+        //    case "user":
+        //    case "role":
+        //    case "client":
+        //    case "realms":
+        //    case "users":
+        //    case "roles":
+        //    case "clients":
+        //    case "available-roles":
+                return ResourceType.fromTypeName(option);
+        //    default:
+        //        throw new RuntimeException("Unsupported resource: " + option);
+        //}
     }
 }

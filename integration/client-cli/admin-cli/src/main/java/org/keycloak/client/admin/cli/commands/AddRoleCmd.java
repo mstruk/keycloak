@@ -175,7 +175,7 @@ public class AddRoleCmd extends AbstractAuthOptionsCmd implements Command {
             List<RoleRepresentation> roles;
 
             if (clientid != null) {
-                ClientRepresentation clientRepresentation = ClientOperations.getForClientId(client, realm, clientid);
+                ClientRepresentation clientRepresentation = ClientOperations.getByClientId(client, realm, clientid);
                 if (clientRepresentation == null) {
                     throw new RuntimeException("Client not found for clientId: " + clientid);
                 }

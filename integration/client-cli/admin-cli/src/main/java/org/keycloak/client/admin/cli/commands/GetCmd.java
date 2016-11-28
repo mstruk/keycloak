@@ -26,9 +26,10 @@ import org.jboss.aesh.console.command.invocation.CommandInvocation;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.config.ConfigData;
+import org.keycloak.client.admin.cli.operations.ResourceHandler;
 import org.keycloak.client.admin.cli.util.OutputFormat;
 import org.keycloak.client.admin.cli.util.ParseUtil;
-import org.keycloak.client.admin.cli.util.ResourceType;
+import org.keycloak.client.admin.cli.operations.ResourceType;
 import org.keycloak.client.admin.cli.util.ReturnFields;
 import org.keycloak.util.JsonSerialization;
 
@@ -99,6 +100,7 @@ public class GetCmd extends AbstractAuthOptionsCmd {
 
             Iterator<String> it = args.iterator();
             resourceType = checkResourceType(it.next());
+            ResourceHandler handler = resourceType.newHandler();
 
             String id = null;
             if (!resourceType.isCollectionType()) {
@@ -140,7 +142,7 @@ public class GetCmd extends AbstractAuthOptionsCmd {
                         break;
                     }
                     default: {
-                        throw new IllegalArgumentException("Invalid option: " + option);
+                        handler.parseArgument(option, it);
                     }
                 }
             }
@@ -178,11 +180,13 @@ public class GetCmd extends AbstractAuthOptionsCmd {
                     .authorization(auth)
                     .build();
 
+            handler.processArguments(client, realm);
+
             Object result;
             if (resourceType.isCollectionType()) {
-                result = resourceType.getMany(client, realm, offset, limit, filter);
+                result = handler.getMany(client, realm, offset, limit, filter);
             } else {
-                result = resourceType.get(client, realm, id);
+                result = handler.get(client, realm, id);
             }
 
             if (returnFields != null) {

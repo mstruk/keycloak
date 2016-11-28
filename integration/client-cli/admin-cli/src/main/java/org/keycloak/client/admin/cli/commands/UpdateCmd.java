@@ -28,9 +28,10 @@ import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.common.CmdStdinContext;
 import org.keycloak.client.admin.cli.config.ConfigData;
+import org.keycloak.client.admin.cli.operations.ResourceHandler;
 import org.keycloak.client.admin.cli.util.ParseUtil;
 import org.keycloak.client.admin.cli.util.ReflectionUtil;
-import org.keycloak.client.admin.cli.util.ResourceType;
+import org.keycloak.client.admin.cli.operations.ResourceType;
 import org.keycloak.util.JsonSerialization;
 
 import java.io.PrintWriter;
@@ -86,6 +87,7 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
         List<AttributeOperation> attrs = new LinkedList<>();
 
         ResourceType resourceType = null;
+        ResourceHandler handler = resourceType.newHandler();
 
         try {
             if (printHelp()) {
@@ -180,7 +182,7 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
 
 
             if (mergeMode) {
-                Object result = resourceType.get(client, realm, id);
+                Object result = handler.get(client, realm, id);
                 CmdStdinContext ctxremote = new CmdStdinContext();
                 ctxremote.setResult(result);
 
@@ -200,9 +202,9 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
             }
 
             // now update
-            resourceType.update(client, realm, ctx.getResult());
+            handler.update(client, realm, ctx.getResult());
 
-            outputResult(resourceType, client, realm, id);
+            outputResult(handler, client, realm, id);
 
             return CommandResult.SUCCESS;
 
@@ -213,9 +215,9 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
         }
     }
 
-    private void outputResult(ResourceType rtype, Keycloak client, String realm, String id) {
+    private void outputResult(ResourceHandler handler, Keycloak client, String realm, String id) {
         if (outputResult) {
-            Object result = rtype.get(client, realm, id);
+            Object result = handler.get(client, realm, id);
             try {
                 if (compressed) {
                     printOut(JsonSerialization.writeValueAsString(result));

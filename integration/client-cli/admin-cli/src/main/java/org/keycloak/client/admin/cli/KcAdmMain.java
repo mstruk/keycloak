@@ -64,7 +64,7 @@ public class KcAdmMain {
 
         // work around parser issues with quotes and brackets
         ArrayList<String> arguments = new ArrayList<>();
-        arguments.add("kcreg");
+        arguments.add("kcadm");
         arguments.addAll(Arrays.asList(args));
         Globals.args = arguments;
 
@@ -84,7 +84,7 @@ public class KcAdmMain {
         }
         console.setEcho(false);
 
-        console.execute("kcreg" + b.toString());
+        console.execute("kcadm" + b.toString());
 
         console.start();
     }

@@ -25,8 +25,9 @@ import org.jboss.aesh.console.command.invocation.CommandInvocation;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.config.ConfigData;
+import org.keycloak.client.admin.cli.operations.ResourceHandler;
 import org.keycloak.client.admin.cli.util.ParseUtil;
-import org.keycloak.client.admin.cli.util.ResourceType;
+import org.keycloak.client.admin.cli.operations.ResourceType;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -68,6 +69,7 @@ public class DeleteCmd extends AbstractAuthOptionsCmd {
                 throw new IllegalArgumentException("TYPE not specified");
             }
             resourceType = checkResourceType(args.get(0));
+            ResourceHandler handler = resourceType.newHandler();
 
             if (args.size() < 2) {
                 throw new IllegalArgumentException("Resource ID not specified");
@@ -109,7 +111,7 @@ public class DeleteCmd extends AbstractAuthOptionsCmd {
                     .authorization(auth)
                     .build();
 
-            resourceType.delete(client, realm, id);
+            handler.delete(client, realm, id);
 
             return CommandResult.SUCCESS;
 

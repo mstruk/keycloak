@@ -78,7 +78,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
     @Option(name = "fields", description = "A pattern specifying which attributes of JSON response body to actually display as result - causes mismatch with Content-Length header", hasValue = true)
     protected String fields;
 
-    @Option(shortName = 'r', name = "response-head", description = "Print response headers", hasValue = false)
+    @Option(shortName = 'h', name = "print-headers", description = "Print response headers", hasValue = false)
     protected boolean printHeaders ;
 
     @Option(shortName = 'i', name = "id", description = "After creation print created resource id to standard output", hasValue = false)

@@ -29,6 +29,7 @@ import org.keycloak.client.admin.cli.util.IoUtil;
 import java.io.File;
 
 import static org.keycloak.client.admin.cli.config.FileConfigHandler.setConfigFile;
+import static org.keycloak.client.admin.cli.util.ConfigUtil.DEFAULT_CLIENT;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.checkAuthInfo;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.checkServerInfo;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
@@ -39,9 +40,6 @@ import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
  */
 public abstract class AbstractAuthOptionsCmd extends AbstractGlobalOptionsCmd {
 
-    static final String DEFAULT_CLIENT = "admin-cli";
-
-
     @Option(name = "config", description = "Path to the config file (~/.keycloak/kcreg.config by default)", hasValue = true)
     protected String config;
 
@@ -50,6 +48,9 @@ public abstract class AbstractAuthOptionsCmd extends AbstractGlobalOptionsCmd {
 
     @Option(name = "server", description = "Server endpoint url (e.g. 'http://localhost:8080/auth')", hasValue = true)
     protected String server;
+
+    @Option(shortName = 'r', name = "targetrealm", description = "Realm to target - when it's different than the realm we authenticate against", hasValue = true)
+    protected String targetRealm;
 
     @Option(name = "realm", description = "Realm name to authenticate against", hasValue = true)
     protected String realm;
@@ -115,6 +116,11 @@ public abstract class AbstractAuthOptionsCmd extends AbstractGlobalOptionsCmd {
                 user == null && password == null &&
                 keystore == null && storePass == null && keyPass == null && alias == null &&
                 trustStore == null && trustPass == null && config == null;
+    }
+
+
+    protected String getTargetRealm(ConfigData config) {
+        return targetRealm != null ? targetRealm : config.getRealm();
     }
 
     protected void processGlobalOptions() {

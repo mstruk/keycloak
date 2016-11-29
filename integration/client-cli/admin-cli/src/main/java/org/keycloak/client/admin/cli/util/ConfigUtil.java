@@ -29,6 +29,8 @@ import org.keycloak.representations.AccessTokenResponse;
  */
 public class ConfigUtil {
 
+    public static final String DEFAULT_CLIENT = "admin-cli";
+
     public static final String DEFAULT_CONFIG_FILE_STRING = OsUtil.OS_ARCH.isWindows() ? "%HOMEDRIVE%%HOMEPATH%\\.keycloak\\kcadm.config" : "~/.keycloak/kcadm.config";
 
     public static final String DEFAULT_CONFIG_FILE_PATH = System.getProperty("user.home") + "/.keycloak/kcadm.config";
@@ -101,5 +103,15 @@ public class ConfigUtil {
             handler = memhandler;
         }
         memhandler.setConfigData(config);
+    }
+
+    public static String getEffectiveClientId(ConfigData config) {
+        String clientId = DEFAULT_CLIENT;
+
+        RealmConfigData realmData = config.sessionRealmConfigData();
+        if (realmData != null && realmData.getClientId() != null) {
+            clientId = realmData.getClientId();
+        }
+        return clientId;
     }
 }

@@ -14,6 +14,7 @@ import org.keycloak.client.admin.cli.common.CmdStdinContext;
 import org.keycloak.client.admin.cli.config.ConfigData;
 import org.keycloak.client.admin.cli.operations.ResourceHandler;
 import org.keycloak.client.admin.cli.operations.ResourceType;
+import org.keycloak.client.admin.cli.util.ConfigUtil;
 import org.keycloak.util.JsonSerialization;
 
 import java.io.PrintWriter;
@@ -141,14 +142,15 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
             auth = auth != null ? "Bearer " + auth : null;
 
             final String server = config.getServerUrl();
-            final String realm = config.getRealm();
+            final String clientId = ConfigUtil.getEffectiveClientId(config);
+            final String realm = getTargetRealm(config);
 
             // Initialize admin client Keycloak object
             // delegate to resource type create method
             Keycloak client = KeycloakBuilder.builder()
                     .serverUrl(server)
                     .realm(realm)
-                    .clientId(config.getRealmConfigData(server, realm).getClientId())
+                    .clientId(clientId)
                     .authorization(auth)
                     .build();
 

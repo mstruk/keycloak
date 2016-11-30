@@ -31,6 +31,7 @@ import org.keycloak.client.admin.cli.operations.ClientOperations;
 import org.keycloak.client.admin.cli.operations.RoleOperations;
 import org.keycloak.client.admin.cli.operations.RoleSearch;
 import org.keycloak.client.admin.cli.operations.UserOperations;
+import org.keycloak.client.admin.cli.util.ConfigUtil;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -57,22 +58,22 @@ import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
 public class AddRoleCmd extends AbstractAuthOptionsCmd implements Command {
 
     @Option(name = "username", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
-    protected String username;
+    String username;
 
     @Option(name = "userid", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
-    protected String userid;
+    String userid;
 
     //@OptionGroup(name = "rolename", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
-    //protected String rolename;
+    //pString rolename;
 
     //@OptionGroup(name = "roleid", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
-    //protected String roleid;
+    //String roleid;
 
     @Option(name = "clientid", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
-    protected String clientid;
+    String clientid;
 
     @Arguments
-    protected List<String> args;
+    List<String> args;
 
 
     @Override
@@ -138,14 +139,16 @@ public class AddRoleCmd extends AbstractAuthOptionsCmd implements Command {
             auth = auth != null ? "Bearer " + auth : null;
 
             final String server = config.getServerUrl();
-            final String realm = config.getRealm();
+            final String clientId = ConfigUtil.getEffectiveClientId(config);
+            final String realm = getTargetRealm(config);
+
 
             // Initialize admin client Keycloak object
             // delegate to resource type create method
             Keycloak client = KeycloakBuilder.builder()
                     .serverUrl(server)
                     .realm(realm)
-                    .clientId(config.getRealmConfigData(server, realm).getClientId())
+                    .clientId(clientId)
                     .authorization(auth)
                     .build();
 

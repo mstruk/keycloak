@@ -2,6 +2,7 @@ package org.keycloak.client.admin.cli.operations;
 
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.client.admin.cli.util.HttpUtil;
+import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -98,5 +99,13 @@ public class UserOperations {
 
     public static void addClientRoles(Keycloak client, String realm, String id, String idOfClient, List<RoleRepresentation> roles) {
         client.realm(realm).users().get(id).roles().clientLevel(idOfClient).add(roles);
+    }
+
+    public static void resetPassword(Keycloak client, String realm, UserRepresentation user, String password, boolean temporary) {
+        CredentialRepresentation creds = new CredentialRepresentation();
+        creds.setType("password");
+        creds.setValue(password);
+        creds.setTemporary(temporary);
+        client.realm(realm).users().get(user.getId()).resetPassword(creds);
     }
 }

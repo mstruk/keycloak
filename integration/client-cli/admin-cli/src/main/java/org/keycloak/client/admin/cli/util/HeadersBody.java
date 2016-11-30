@@ -31,6 +31,11 @@ public class HeadersBody {
     private List<Pair> headers;
     private InputStream body;
 
+
+    public HeadersBody(List<Pair> headers) {
+        this.headers = headers;
+    }
+
     public HeadersBody(List<Pair> headers, InputStream body) {
         this.headers = headers;
         this.body = body;

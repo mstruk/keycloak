@@ -18,7 +18,9 @@
 package org.keycloak.client.admin.cli.util;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.common.CmdStdinContext;
 import org.keycloak.client.admin.cli.operations.ResourceType;
@@ -52,41 +54,39 @@ public class ParseUtil {
         return parsed;
     }
 
-    public static <T> CmdStdinContext<T> parseFileOrStdin(String file, Class<T> type) {
+    public static CmdStdinContext<ObjectNode> parseFileOrStdin(String file) {
 
         String content = readFileOrStdin(file).trim();
-        T result = null;
+        ObjectNode result = null;
 
         if (content.length() == 0) {
             throw new RuntimeException("Document provided by --file option is empty");
         }
 
         try {
-            result = JsonSerialization.readValue(content, type);
+            result = JsonSerialization.readValue(content, ObjectNode.class);
         } catch (JsonParseException e) {
             throw new RuntimeException("Not a valid JSON document - " + e.getMessage(), e);
-        } catch (UnrecognizedPropertyException e) {
-            throw new RuntimeException("Attribute '" + e.getPropertyName() + "' not supported on document type '" + type.getName() + "'", e);
         } catch (IOException e) {
             throw new RuntimeException("Failed to read the input document as JSON: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException("Not a valid JSON document", e);
         }
 
-        CmdStdinContext ctx = new CmdStdinContext();
+        CmdStdinContext<ObjectNode> ctx = new CmdStdinContext<>();
         ctx.setContent(content);
         ctx.setResult(result);
         return ctx;
     }
 
-    public static <T> CmdStdinContext<T> mergeAttributes(CmdStdinContext<T> ctx, Constructor<T> constructor, List<AttributeOperation> attrs) {
+    public static <T> CmdStdinContext<ObjectNode> mergeAttributes(CmdStdinContext<ObjectNode> ctx, ObjectNode newObject, List<AttributeOperation> attrs) {
         String content = ctx.getContent();
-        T result = ctx.getResult();
+        ObjectNode result = ctx.getResult();
         try {
 
             if (result == null) {
                 try {
-                    result = constructor.newInstance();
+                    result = newObject;
                 } catch (Throwable e) {
                     throw new RuntimeException("Failed to instantiate object: " + e.getMessage(), e);
                 }

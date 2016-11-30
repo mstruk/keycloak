@@ -39,7 +39,7 @@ import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
 public class ConfigCmd extends AbstractAuthOptionsCmd implements Command {
 
     @Arguments
-    protected List<String> args;
+    List<String> args;
 
 
     public CommandResult execute(CommandInvocation commandInvocation) throws CommandException, InterruptedException {

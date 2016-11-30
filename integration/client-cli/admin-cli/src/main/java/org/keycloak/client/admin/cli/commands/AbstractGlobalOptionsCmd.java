@@ -16,9 +16,16 @@
  */
 package org.keycloak.client.admin.cli.commands;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.jboss.aesh.cl.Option;
 import org.jboss.aesh.console.command.Command;
 import org.keycloak.client.admin.cli.aesh.Globals;
+import org.keycloak.client.admin.cli.util.FilterUtil;
+import org.keycloak.client.admin.cli.util.ReturnFields;
+
+import java.io.IOException;
+import java.util.Iterator;
 
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 
@@ -28,10 +35,10 @@ import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 public abstract class AbstractGlobalOptionsCmd implements Command {
 
     @Option(shortName = 'x', description = "Print full stack trace when exiting with error", hasValue = false)
-    protected boolean dumpTrace;
+    boolean dumpTrace;
 
     @Option(name = "help", description = "Print command specific help", hasValue = false)
-    protected boolean help;
+    boolean help;
 
     protected void initFromParent(AbstractGlobalOptionsCmd parent) {
         dumpTrace = parent.dumpTrace;
@@ -57,5 +64,54 @@ public abstract class AbstractGlobalOptionsCmd implements Command {
 
     protected String help() {
         return KcAdmCmd.usage();
+    }
+
+    protected String composeResourceUrl(String adminRoot, String realm, String uri) {
+        if (!uri.startsWith("http:")) {
+            if ("realms".equals(uri) || uri.startsWith("realms/")) {
+                uri = normalize(adminRoot) + uri;
+            } else {
+                uri = normalize(adminRoot) + "realms/" + realm + "/" + uri;
+            }
+        }
+        return uri;
+    }
+
+    protected String composeAdminRoot(String server) {
+        return normalize(server) + "admin";
+    }
+
+    protected String normalize(String value) {
+        return value.endsWith("/") ? value : value + "/";
+    }
+
+    protected void requireValue(Iterator<String> it, String option) {
+        if (!it.hasNext()) {
+            throw new IllegalArgumentException("Option " + option + " requires a value");
+        }
+    }
+
+    protected String extractTypeNameFromUri(String resourceUrl) {
+        String type = extractLastComponentOfUri(resourceUrl);
+        if (type.endsWith("s")) {
+            type = type.substring(0, type.length()-1);
+        }
+        return type;
+    }
+
+    protected String extractLastComponentOfUri(String resourceUrl) {
+        int endPos = resourceUrl.endsWith("/") ? resourceUrl.length()-2 : resourceUrl.length()-1;
+        int pos = resourceUrl.lastIndexOf("/", endPos);
+        pos = pos == -1 ? 0 : pos;
+        return resourceUrl.substring(pos+1, endPos+1);
+    }
+
+    protected JsonNode applyFieldFilter(ObjectMapper mapper, JsonNode rootNode, ReturnFields returnFields) {
+        // construct new JsonNode that satisfies filtering specified by returnFields
+        try {
+            return FilterUtil.copyFilteredObject(rootNode, returnFields);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to apply fields filter", e);
+        }
     }
 }

@@ -17,27 +17,31 @@
 
 package org.keycloak.client.admin.cli.commands;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.jboss.aesh.cl.Arguments;
 import org.jboss.aesh.cl.CommandDefinition;
 import org.jboss.aesh.cl.Option;
 import org.jboss.aesh.console.command.CommandException;
 import org.jboss.aesh.console.command.CommandResult;
 import org.jboss.aesh.console.command.invocation.CommandInvocation;
-import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.config.ConfigData;
-import org.keycloak.client.admin.cli.operations.ResourceHandler;
-import org.keycloak.client.admin.cli.util.ConfigUtil;
+import org.keycloak.client.admin.cli.util.AccessibleBufferOutputStream;
+import org.keycloak.client.admin.cli.util.HeadersBody;
+import org.keycloak.client.admin.cli.util.HeadersBodyStatus;
+import org.keycloak.client.admin.cli.util.HttpUtil;
 import org.keycloak.client.admin.cli.util.OutputFormat;
-import org.keycloak.client.admin.cli.util.ParseUtil;
-import org.keycloak.client.admin.cli.operations.ResourceType;
+import org.keycloak.client.admin.cli.util.Pair;
 import org.keycloak.client.admin.cli.util.ReturnFields;
-import org.keycloak.util.JsonSerialization;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -45,14 +49,14 @@ import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.DEFAULT_CONFIG_FILE_STRING;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.credentialsAvailable;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
-import static org.keycloak.client.admin.cli.util.FilterUtil.copyFilteredObject;
+import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
+import static org.keycloak.client.admin.cli.util.IoUtil.printErr;
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
-import static org.keycloak.client.admin.cli.util.IoUtil.warnfErr;
 import static org.keycloak.client.admin.cli.util.OsUtil.CMD;
 import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
 import static org.keycloak.client.admin.cli.util.OsUtil.PROMPT;
+import static org.keycloak.client.admin.cli.util.OutputUtil.MAPPER;
 import static org.keycloak.client.admin.cli.util.OutputUtil.printAsCsv;
-import static org.keycloak.client.admin.cli.util.ParseUtil.checkResourceType;
 import static org.keycloak.client.admin.cli.util.ParseUtil.parseKeyVal;
 
 
@@ -62,32 +66,39 @@ import static org.keycloak.client.admin.cli.util.ParseUtil.parseKeyVal;
 @CommandDefinition(name = "get", description = "[ARGUMENTS]")
 public class GetCmd extends AbstractAuthOptionsCmd {
 
-    @Option(shortName = 'c', name = "compressed", description = "Print full stack trace when exiting with error", hasValue = false)
-    private boolean compressed = false;
+    @Option(shortName = 'a', name = "admin-root", description = "URL of Admin REST endpoint root - e.g. http://localhost:8080/auth/admin", hasValue = true)
+    String adminRestRoot;
 
-    //@Option(shortName = 'f', name = "filter", description = "Filter resource list by specified fields and their values", hasValue = false)
-    //private List<String> queryFilter;
+    @Option(shortName = 'p', name = "pretty", description = "Pretty print if response type is application/json - causes mismatch with Content-Length header", hasValue = false, defaultValue = "true")
+    boolean pretty;
 
-    @Option(name = "fields", description = "A pattern specifying which attributes of JSON response to actually display as result", hasValue = true)
-    protected String fields;
+    @Option(shortName = 'f', name = "file", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
+    String file;
+
+    @Option(name = "fields", description = "A pattern specifying which attributes of JSON response body to actually display as result - causes mismatch with Content-Length header", hasValue = true)
+    String fields;
+
+    @Option(shortName = 'H', name = "print-headers", description = "Print response headers", hasValue = false)
+    boolean printHeaders ;
+
+    @Option(shortName = 'c', name = "compressed", description = "Don't pretty print the output", hasValue = false)
+    boolean compressed = false;
 
     @Option(shortName = 'o', name = "offset", description = "Number of results from beginning of resultset to skip", hasValue = true)
-    private int offset = 0;
+    int offset = 0;
 
     @Option(shortName = 'l', name = "limit", description = "Maksimum number of results to return", hasValue = true, defaultValue = "1000")
-    private int limit = 1000;
+    int limit = 1000;
 
     @Option(name = "format", description = "Output format - one of: json, csv", hasValue = true, defaultValue = "json")
-    protected String format;
+    String format;
 
     @Arguments
-    private List<String> args;
+    List<String> args;
+
 
     @Override
     public CommandResult execute(CommandInvocation commandInvocation) throws CommandException, InterruptedException {
-
-        ResourceType resourceType = null;
-
         try {
             if (printHelp()) {
                 return help ? CommandResult.SUCCESS : CommandResult.FAILURE;
@@ -95,132 +106,158 @@ public class GetCmd extends AbstractAuthOptionsCmd {
 
             processGlobalOptions();
 
-            if (args == null || args.isEmpty()) {
-                throw new IllegalArgumentException("TYPE not specified");
-            }
-
-            Iterator<String> it = args.iterator();
-            resourceType = checkResourceType(it.next());
-            ResourceHandler handler = resourceType.newHandler();
-
-            String id = null;
-            if (!resourceType.isCollectionType()) {
-                if (!it.hasNext()) {
-                    throw new IllegalArgumentException("Resource ID not specified");
-                }
-                id = it.next();
-
-                if (id.startsWith("-")) {
-                    warnfErr(ParseUtil.ID_OPTION_WARN, id);
-                }
-            }
-
-            OutputFormat outputFormat;
-            try {
-                outputFormat = OutputFormat.valueOf(format.toUpperCase());
-            } catch (Exception e) {
-                throw new RuntimeException("Unsupported output format: " + format);
-            }
-
-            Map<String, String> filter = new HashMap<>();
-
-            while (it.hasNext()) {
-                String option = it.next();
-                switch (option) {
-                    case "-f":
-                    case "--filter": {
-                        if (!it.hasNext()) {
-                            throw new IllegalArgumentException("Option " + option + " requires a value");
-                        }
-                        String arg = it.next();
-                        String[] keyVal;
-                        if (arg.indexOf("=") == -1) {
-                            keyVal = new String[] {"", arg};
-                        } else {
-                            keyVal = parseKeyVal(arg);
-                        }
-                        filter.put(keyVal[0], keyVal[1]);
-                        break;
-                    }
-                    default: {
-                        handler.parseArgument(option, it);
-                    }
-                }
-            }
-
-            ReturnFields returnFields = null;
-
-            if (fields != null) {
-                returnFields = new ReturnFields(fields);
-            }
-
-            ConfigData config = loadConfig();
-            config = copyWithServerInfo(config);
-
-            setupTruststore(config, commandInvocation);
-
-            String auth = null;
-
-            config = ensureAuthInfo(config, commandInvocation);
-            config = copyWithServerInfo(config);
-            if (credentialsAvailable(config)) {
-                auth = ensureToken(config);
-            }
-
-            auth = auth != null ? "Bearer " + auth : null;
-
-            final String server = config.getServerUrl();
-            final String clientId = ConfigUtil.getEffectiveClientId(config);
-            final String realm = getTargetRealm(config);
-
-            // Initialize admin client Keycloak object
-            // delegate to resource type create method
-            Keycloak client = KeycloakBuilder.builder()
-                    .serverUrl(server)
-                    .realm(realm)
-                    .clientId(clientId)
-                    .authorization(auth)
-                    .build();
-
-            handler.processArguments(client, realm);
-
-            Object result;
-            if (resourceType.isCollectionType()) {
-                result = handler.getMany(client, realm, offset, limit, filter);
-            } else {
-                result = handler.get(client, realm, id);
-            }
-
-            if (returnFields != null) {
-                try {
-                    result = copyFilteredObject(result, returnFields);
-                } catch (Exception e) {
-                    throw new RuntimeException("Failed to filter response", e);
-                }
-            }
-
-            try {
-                if (outputFormat == OutputFormat.JSON) {
-                    if (compressed) {
-                        printOut(JsonSerialization.writeValueAsString(result));
-                    } else {
-                        printOut(JsonSerialization.writeValueAsPrettyString(result));
-                    }
-                } else {
-                    printAsCsv(result, returnFields);
-                }
-
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to print result as JSON " + result);
-            }
-
-            return CommandResult.SUCCESS;
-
+            return process(commandInvocation);
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException(e.getMessage() + suggestHelp(), e);
         } finally {
             commandInvocation.stop();
         }
+    }
+
+
+    public CommandResult process(CommandInvocation commandInvocation) throws CommandException, InterruptedException {
+
+        LinkedHashMap<String, Pair> headers = new LinkedHashMap<>();
+
+        String type = "get";
+        String url = null;
+
+        if (args == null || args.isEmpty()) {
+            throw new IllegalArgumentException("URI not specified");
+        }
+
+        OutputFormat outputFormat;
+        try {
+            outputFormat = OutputFormat.valueOf(format.toUpperCase());
+        } catch (Exception e) {
+            throw new RuntimeException("Unsupported output format: " + format);
+        }
+
+        Map<String, String> filter = new HashMap<>();
+
+        Iterator<String> it = args.iterator();
+
+        while (it.hasNext()) {
+            String option = it.next();
+            switch (option) {
+                case "-f":
+                case "--filter": {
+                    if (!it.hasNext()) {
+                        throw new IllegalArgumentException("Option " + option + " requires a value");
+                    }
+                    String arg = it.next();
+                    String[] keyVal;
+                    if (arg.indexOf("=") == -1) {
+                        keyVal = new String[] {"", arg};
+                    } else {
+                        keyVal = parseKeyVal(arg);
+                    }
+                    filter.put(keyVal[0], keyVal[1]);
+                    break;
+                }
+                default: {
+                    if (url == null) {
+                        url = option;
+                    } else {
+                        throw new IllegalArgumentException("Illegal argument: " + option);
+                    }
+                }
+            }
+        }
+
+        if (url == null) {
+            throw new IllegalArgumentException("Resource URI not specified");
+        }
+
+        ReturnFields returnFields = null;
+
+        if (fields != null) {
+            returnFields = new ReturnFields(fields);
+        }
+
+        ConfigData config = loadConfig();
+        config = copyWithServerInfo(config);
+
+        setupTruststore(config, commandInvocation);
+
+        String auth = null;
+
+        config = ensureAuthInfo(config, commandInvocation);
+        config = copyWithServerInfo(config);
+        if (credentialsAvailable(config)) {
+            auth = ensureToken(config);
+        }
+
+        auth = auth != null ? "Bearer " + auth : null;
+
+        if (auth != null) {
+            headers.put("Authorization", new Pair("Authorization", auth));
+        }
+
+
+        final String server = config.getServerUrl();
+        final String realm = getTargetRealm(config);
+        final String adminRoot = adminRestRoot != null ? adminRestRoot : composeAdminRoot(server);
+
+        String resourceUrl = composeResourceUrl(adminRoot, realm, url);
+        String typeName = extractTypeNameFromUri(resourceUrl);
+
+        HeadersBodyStatus response;
+        try {
+            response = HttpUtil.doRequest(type, resourceUrl, new HeadersBody(new LinkedList<>(headers.values())));
+        } catch (IOException e) {
+            throw new RuntimeException("HTTP request error: " + e.getMessage(), e);
+        }
+
+        // output response
+        if (printHeaders) {
+            printOut(response.getStatus());
+            for (Pair p : response.getHeaders()) {
+                printOut(p.getKey() + ": " + p.getValue());
+            }
+        }
+
+        response.checkSuccess();
+
+        AccessibleBufferOutputStream abos = new AccessibleBufferOutputStream(System.out);
+        if (response.getBody() == null) {
+            throw new RuntimeException("Internal error - response body should never be null");
+        }
+
+        if (printHeaders) {
+            printOut("");
+        }
+
+
+        String location = response.getHeader("Location");
+        if (pretty || returnFields != null) {
+            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+            copyStream(response.getBody(), buffer);
+
+            try {
+                JsonNode rootNode = MAPPER.readValue(buffer.toByteArray(), JsonNode.class);
+                if (returnFields != null) {
+                    rootNode = applyFieldFilter(MAPPER, rootNode, returnFields);
+                }
+                if (outputFormat == OutputFormat.JSON) {
+                    // now pretty print it to output
+                    MAPPER.writeValue(abos, rootNode);
+                } else {
+                    printAsCsv(rootNode, returnFields);
+                }
+            } catch (Exception ignored) {
+                copyStream(new ByteArrayInputStream(buffer.toByteArray()), abos);
+            }
+        } else {
+            copyStream(response.getBody(), abos);
+        }
+
+        int lastByte = abos.getLastByte();
+        if (lastByte != -1 && lastByte != 13 && lastByte != 10) {
+            printErr("");
+        }
+
+        return CommandResult.SUCCESS;
     }
 
     @Override

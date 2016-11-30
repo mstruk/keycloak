@@ -29,7 +29,6 @@ import org.jboss.aesh.console.command.CommandResult;
 import org.jboss.aesh.console.command.invocation.CommandInvocation;
 import org.keycloak.client.admin.cli.config.ConfigData;
 import org.keycloak.client.admin.cli.util.AccessibleBufferOutputStream;
-import org.keycloak.client.admin.cli.util.FilterUtil;
 import org.keycloak.client.admin.cli.util.HeadersBody;
 import org.keycloak.client.admin.cli.util.HeadersBodyStatus;
 import org.keycloak.client.admin.cli.util.HttpUtil;
@@ -45,8 +44,9 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
@@ -66,26 +66,23 @@ import static org.keycloak.client.admin.cli.util.ParseUtil.parseKeyVal;
 @CommandDefinition(name = "rest", description = "TYPE URL [ARGUMENTS]")
 public class RestCmd extends AbstractAuthOptionsCmd implements Command {
 
-    @Option(shortName = 'a', name = "auth", description = "Add Authorization header with a fresh token", hasValue = false)
-    protected boolean authorize;
-
     @Option(shortName = 'p', name = "pretty", description = "Pretty print if response type is application/json - causes mismatch with Content-Length header", hasValue = false)
-    protected boolean pretty;
+    boolean pretty;
 
     @Option(shortName = 'f', name = "file", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
-    protected String file;
+    String file;
 
     @Option(name = "fields", description = "A pattern specifying which attributes of JSON response body to actually display as result - causes mismatch with Content-Length header", hasValue = true)
-    protected String fields;
+    String fields;
 
-    @Option(shortName = 'h', name = "print-headers", description = "Print response headers", hasValue = false)
-    protected boolean printHeaders ;
+    @Option(shortName = 'H', name = "print-headers", description = "Print response headers", hasValue = false)
+    boolean printHeaders ;
 
     @Option(shortName = 'i', name = "id", description = "After creation print created resource id to standard output", hasValue = false)
-    protected boolean returnId = false;
+    boolean returnId;
 
     @Arguments
-    private List<String> args;
+    List<String> args;
 
     @Override
     public CommandResult execute(CommandInvocation commandInvocation) throws CommandException, InterruptedException {
@@ -106,7 +103,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
 
     public CommandResult process(CommandInvocation commandInvocation) throws CommandException, InterruptedException {
 
-        List<Pair> headers = new ArrayList<>();
+        LinkedHashMap<String, Pair> headers = new LinkedHashMap<>();
 
         if (args == null || args.isEmpty()) {
             throw new IllegalArgumentException("Request TYPE not specified");
@@ -124,7 +121,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
                     case "--header": {
                         requireValue(it, option);
                         String[] keyVal = parseKeyVal(it.next());
-                        headers.add(new Pair(keyVal[0], keyVal[1]));
+                        headers.put(keyVal[0], new Pair(keyVal[0], keyVal[1]));
                         break;
                     }
                     default: {
@@ -166,7 +163,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
         ConfigData config = loadConfig();
         config = copyWithServerInfo(config);
 
-        if (authorize) {
+        if (!noconfig) {
             String auth = null;
             config = ensureAuthInfo(config, commandInvocation);
             config = copyWithServerInfo(config);
@@ -174,7 +171,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
                 auth = ensureToken(config);
             }
             if (auth != null) {
-                headers.add(new Pair("Authorization", "Bearer " + auth));
+                headers.put("Authorization", new Pair("Authorization", "Bearer " + auth));
             }
         }
 
@@ -186,7 +183,7 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
 
         HeadersBodyStatus response;
         try {
-            response = HttpUtil.doRequest(type, url, new HeadersBody(headers, body));
+            response = HttpUtil.doRequest(type, url, new HeadersBody(new LinkedList<>(headers.values()), body));
         } catch (IOException e) {
             throw new RuntimeException("HTTP request error: " + e.getMessage(), e);
         }
@@ -244,21 +241,6 @@ public class RestCmd extends AbstractAuthOptionsCmd implements Command {
         }
 
         return CommandResult.SUCCESS;
-    }
-
-    private JsonNode applyFieldFilter(ObjectMapper mapper, JsonNode rootNode, ReturnFields returnFields) {
-        // construct new JsonNode that satisfies filtering specified by returnFields
-        try {
-            return FilterUtil.copyFilteredObject(rootNode, returnFields);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to apply fields filter", e);
-        }
-    }
-
-    private void requireValue(Iterator<String> it, String option) {
-        if (!it.hasNext()) {
-            throw new IllegalArgumentException("Option " + option + " requires a value");
-        }
     }
 
     protected String suggestHelp() {

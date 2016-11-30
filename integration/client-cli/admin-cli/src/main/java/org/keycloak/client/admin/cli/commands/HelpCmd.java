@@ -35,7 +35,7 @@ import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 public class HelpCmd implements Command {
 
     @Arguments
-    private List<String> args;
+    List<String> args;
 
     @Override
     public CommandResult execute(CommandInvocation commandInvocation) throws CommandException, InterruptedException {

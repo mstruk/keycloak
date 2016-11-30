@@ -19,7 +19,7 @@ import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
  */
 public class OutputUtil {
 
-    static ObjectMapper MAPPER = new ObjectMapper();
+    public static ObjectMapper MAPPER = new ObjectMapper();
 
     static {
         MAPPER.enable(SerializationFeature.INDENT_OUTPUT);

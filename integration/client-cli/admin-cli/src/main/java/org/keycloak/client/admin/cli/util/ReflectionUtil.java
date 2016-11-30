@@ -18,6 +18,11 @@
 package org.keycloak.client.admin.cli.util;
 
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.BooleanNode;
+import com.fasterxml.jackson.databind.node.DoubleNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import org.keycloak.client.admin.cli.common.AttributeKey;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.util.JsonSerialization;
@@ -33,6 +38,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+
+import static org.keycloak.client.admin.cli.common.AttributeOperation.Type.SET;
+import static org.keycloak.client.admin.cli.util.OutputUtil.MAPPER;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -124,6 +132,78 @@ public class ReflectionUtil {
         }
 
         throw new RuntimeException("Unable to handle type [" + type + "]");
+    }
+
+    public static void setAttributes(JsonNode client, List<AttributeOperation> attrs) {
+        for (AttributeOperation item: attrs) {
+            AttributeKey attr = item.getKey();
+            JsonNode nested = client;
+
+            List<AttributeKey.Component> cs = attr.getComponents();
+            for (int i = 0; i < cs.size(); i++) {
+                AttributeKey.Component c = cs.get(i);
+
+                if (nested.isObject()) {
+                    // see if child c exists already
+                    JsonNode node = nested.get(c.getName());
+                    if (node == null) {
+                        if (SET == item.getType()) {
+                            if (c.isArray()) {
+                                node = MAPPER.createArrayNode();
+                            } else if (i < cs.size() - 1) {
+                                node = MAPPER.createObjectNode();
+                            } else {
+                                String val = item.getValue();
+                                if (isBoolean(val)) {
+                                    ((ObjectNode) nested).set(c.getName(), BooleanNode.valueOf(Boolean.valueOf(val)));
+                                } else if (isNumber(val)) {
+                                    ((ObjectNode) nested).set(c.getName(), DoubleNode.valueOf(Double.valueOf(val)));
+                                } else if (isQuoted(val)) {
+                                    ((ObjectNode) nested).set(c.getName(), TextNode.valueOf(unquote(val)));
+                                } else {
+                                    ((ObjectNode) nested).set(c.getName(), TextNode.valueOf(val));
+                                }
+                                continue;
+                            }
+                        } else {
+                            // delete
+                        }
+                    }
+                    nested = node;
+                    // is it the right type?
+                } else if (nested.isArray()) {
+                    // it has an index
+                    // make sure it contains the index number of items
+                    // create them set to null if needed
+                } else {
+                    // that should not really happen should it?
+                }
+            }
+        }
+    }
+
+    private static boolean isNumber(String val) {
+        try {
+            Double.valueOf(val);
+            return true;
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static boolean isBoolean(String val) {
+        return "false".equals(val) || "true".equals(val);
+    }
+
+    private static boolean isQuoted(String val) {
+        return val.startsWith("'") || val.startsWith("\"");
+    }
+
+    private static String unquote(String val) {
+        if (!(val.startsWith("'") || val.startsWith("\"")) || !(val.endsWith("'") || val.endsWith("\""))) {
+            throw new RuntimeException("Invalid string value: " + val);
+        }
+        return val.substring(1, val.length()-1);
     }
 
     public static void setAttributes(Object client, List<AttributeOperation> attrs) {
@@ -236,7 +316,7 @@ public class ReflectionUtil {
                                 }
 
                             } else {
-                                if (item.getType() == AttributeOperation.Type.SET) {
+                                if (item.getType() == SET) {
                                     try {
                                         Object value = convertValueToType(item.getValue(), itype);
                                         target.set(c.getIndex(), value);
@@ -255,7 +335,7 @@ public class ReflectionUtil {
                         } else {
                             // set the whole list field itself
                             List value = createNewList(type);;
-                            if (item.getType() == AttributeOperation.Type.SET) {
+                            if (item.getType() == SET) {
                                 List converted = convertValueToList(item.getValue(), itype);
                                 value.addAll(converted);
                             }

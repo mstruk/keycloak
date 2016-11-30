@@ -52,7 +52,7 @@ import static org.keycloak.client.admin.cli.util.ParseUtil.checkResourceType;
 public class DeleteCmd extends AbstractAuthOptionsCmd {
 
     @Arguments
-    private List<String> args;
+    List<String> args;
 
     @Override
     public CommandResult execute(CommandInvocation commandInvocation) throws CommandException, InterruptedException {

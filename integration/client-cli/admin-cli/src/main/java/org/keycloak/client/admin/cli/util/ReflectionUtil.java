@@ -17,25 +17,18 @@
 
 package org.keycloak.client.admin.cli.util;
 
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.BooleanNode;
 import com.fasterxml.jackson.databind.node.DoubleNode;
+import com.fasterxml.jackson.databind.node.LongNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.node.TextNode;
 import org.keycloak.client.admin.cli.common.AttributeKey;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
-import org.keycloak.util.JsonSerialization;
 
-import java.io.IOException;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -47,93 +40,6 @@ import static org.keycloak.client.admin.cli.util.OutputUtil.MAPPER;
  */
 public class ReflectionUtil {
 
-    static Map<Class, Map<String, Field>> index = new HashMap<>();
-
-    static void populateAttributesIndex(Class type) {
-        // We are using fields rather than getters / setters
-        // because it seems like JSON mapping sometimes also uses fields as well
-        // This may have to be changed some day due to reliance on Field.setAccessible()
-        Map<String, Field> map = new HashMap<>();
-        Field [] fields  = type.getDeclaredFields();
-        for (Field f: fields) {
-            // make sure to also have access to non-public fields
-            f.setAccessible(true);
-            map.put(f.getName(), f);
-        }
-        index.put(type, map);
-    }
-
-    public static Map<String, Field> getAttrFieldsForType(Type gtype) {
-        Class type;
-        if (gtype instanceof Class) {
-            type = (Class) gtype;
-        } else if (gtype instanceof ParameterizedType) {
-            type = (Class) ((ParameterizedType) gtype).getRawType();
-        } else {
-            throw new RuntimeException("Unexpected type: " + gtype);
-        }
-
-        if (isListType(type) || isMapType(type)) {
-            return Collections.emptyMap();
-        }
-        Map<String, Field> map = index.get(type);
-        if (map == null) {
-            populateAttributesIndex(type);
-            map = index.get(type);
-        }
-        return map;
-    }
-
-    public static boolean isListType(Class type) {
-        return List.class.isAssignableFrom(type) || type.isArray();
-    }
-
-    public static boolean isBasicType(Type type) {
-        return type == String.class || type == Boolean.class || type == boolean.class
-                || type == Integer.class || type == int.class || type == Long.class || type == long.class
-                || type == Float.class || type == float.class || type == Double.class || type == double.class;
-    }
-
-    public static boolean isMapType(Class type) {
-        return Map.class.isAssignableFrom(type);
-    }
-
-    public static Object convertValueToType(Object value, Class<?> type) throws IOException {
-
-        if (value == null) {
-            return null;
-
-        } else if (value instanceof String) {
-            if (type == String.class) {
-                return value;
-            } else if (type == Boolean.class) {
-                return Boolean.valueOf((String) value);
-            } else if (type == Integer.class) {
-                return Integer.valueOf((String) value);
-            } else if (type == Long.class) {
-                return Long.valueOf((String) value);
-            } else {
-                return JsonSerialization.readValue((String) value, type);
-            }
-        } else if (value instanceof Number) {
-            if (type == Integer.class) {
-                return ((Number) value).intValue();
-            } else if (type == Long.class) {
-                return ((Long) value).longValue();
-            } else if (type == String.class) {
-                return String.valueOf(value);
-            }
-        } else if (value instanceof Boolean) {
-            if (type == Boolean.class) {
-                return value;
-            } else if (type == String.class) {
-                return String.valueOf(value);
-            }
-        }
-
-        throw new RuntimeException("Unable to handle type [" + type + "]");
-    }
-
     public static void setAttributes(JsonNode client, List<AttributeOperation> attrs) {
         for (AttributeOperation item: attrs) {
             AttributeKey attr = item.getKey();
@@ -143,42 +49,97 @@ public class ReflectionUtil {
             for (int i = 0; i < cs.size(); i++) {
                 AttributeKey.Component c = cs.get(i);
 
-                if (nested.isObject()) {
-                    // see if child c exists already
+                // if this is the last component of the name,
+                //    then if SET we need to set value on nested:
+                //             if value already set on nested, then overwrite, maybe remove node + add new node
+                //         if DELETE we need to remove or nullify value (if isArray)
+                // else get child and
+                //    if exist set nested to child
+                //    else if SET create new empty object or array - depending on c.isArray()
+                //
+
+                // if this is the last component of the name
+                if (i == cs.size() - 1) {
+                    String val = item.getValue();
+                    ObjectNode obj = (ObjectNode) nested;
+
+                    if (SET == item.getType()) {
+                        JsonNode valNode = valueToJsonNode(val);
+                        if (c.isArray()) {
+                            JsonNode list = obj.get(c.getName());
+                            // nested has to be an array
+                            if ( ! (list instanceof ArrayNode)) {
+                                // replace with new array
+                                list = MAPPER.createArrayNode();
+                                obj.set(c.getName(), list);
+                            }
+                            setArrayItem((ArrayNode) list, c.getIndex(), valNode);
+                        } else {
+                            ((ObjectNode) nested).set(c.getName(), valNode);
+                        }
+                    } else {
+                        // type == DELETE
+                        obj.remove(c.getName());
+                    }
+                } else {
+                    // get child and
+                    //    if exist set nested to child
+                    //    else create new empty object or array - depending on c.isArray()
                     JsonNode node = nested.get(c.getName());
                     if (node == null) {
-                        if (SET == item.getType()) {
-                            if (c.isArray()) {
-                                node = MAPPER.createArrayNode();
-                            } else if (i < cs.size() - 1) {
-                                node = MAPPER.createObjectNode();
-                            } else {
-                                String val = item.getValue();
-                                if (isBoolean(val)) {
-                                    ((ObjectNode) nested).set(c.getName(), BooleanNode.valueOf(Boolean.valueOf(val)));
-                                } else if (isNumber(val)) {
-                                    ((ObjectNode) nested).set(c.getName(), DoubleNode.valueOf(Double.valueOf(val)));
-                                } else if (isQuoted(val)) {
-                                    ((ObjectNode) nested).set(c.getName(), TextNode.valueOf(unquote(val)));
-                                } else {
-                                    ((ObjectNode) nested).set(c.getName(), TextNode.valueOf(val));
-                                }
-                                continue;
-                            }
+                        if (c.isArray()) {
+                            node = MAPPER.createArrayNode();
                         } else {
-                            // delete
+                            node = MAPPER.createObjectNode();
                         }
+                        ((ObjectNode) nested).set(c.getName(), node);
                     }
                     nested = node;
-                    // is it the right type?
-                } else if (nested.isArray()) {
-                    // it has an index
-                    // make sure it contains the index number of items
-                    // create them set to null if needed
-                } else {
-                    // that should not really happen should it?
                 }
             }
+        }
+    }
+
+    private static void setArrayItem(ArrayNode list, int index, JsonNode valNode) {
+        // make sure items up to index exist
+        for (int i = list.size(); i < index+1; i++) {
+            list.add(NullNode.instance);
+        }
+        list.set(index, valNode);
+    }
+
+    private static JsonNode valueToJsonNode(String val) {
+        // try get value as JSON object
+        try {
+            return MAPPER.readValue(val, ObjectNode.class);
+        } catch (Exception ignored) {
+        }
+
+        // try get value as JSON array
+        try {
+            return MAPPER.readValue(val, ArrayNode.class);
+        } catch (Exception ignored) {
+        }
+
+        if (isBoolean(val)) {
+            return BooleanNode.valueOf(Boolean.valueOf(val));
+        } else if (isInteger(val)) {
+            return LongNode.valueOf(Long.valueOf(val));
+        } else if (isNumber(val)) {
+            return DoubleNode.valueOf(Double.valueOf(val));
+        } else if (isQuoted(val)) {
+            return TextNode.valueOf(unquote(val));
+        }
+
+        return TextNode.valueOf(val);
+    }
+
+    private static boolean isInteger(String val) {
+        try {
+            Long.valueOf(val);
+            return true;
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
@@ -206,373 +167,39 @@ public class ReflectionUtil {
         return val.substring(1, val.length()-1);
     }
 
-    public static void setAttributes(Object client, List<AttributeOperation> attrs) {
+    public static void merge(ObjectNode source, ObjectNode dest) {
+        // Iterate over source
+        // For each child check if exists on the destination
+        // if it does go deep
+        // otherwise copy over
+        // if it's last component, set it on destination
 
-        for (AttributeOperation item: attrs) {
+        Iterator<Map.Entry<String, JsonNode>> it = source.fields();
+        while (it.hasNext()) {
+            Map.Entry<String, JsonNode> item = it.next();
+            String name = item.getKey();
+            JsonNode node = item.getValue();
 
-            AttributeKey attr = item.getKey();
-            Object nested = client;
-
-            List<AttributeKey.Component> cs = attr.getComponents();
-            for (int i = 0; i < cs.size(); i++) {
-                AttributeKey.Component c = cs.get(i);
-
-                Class type = nested.getClass();
-                Field field = null;
-
-                if (!isMapType(type)) {
-                    Map<String, Field> fields = getAttrFieldsForType(type);
-                    if (fields == null) {
-                        throw new AttributeException(attr.toString(), "Unexpected condition - unknown type: " + type);
-                    }
-
-                    field = fields.get(c.getName());
-                    Class parent = type;
-                    while (field == null) {
-                        parent = parent.getSuperclass();
-                        if (parent == Object.class) {
-                            throw new AttributeException(attr.toString(), "Unknown attribute '" + c.getName() + "' on " + client.getClass());
-                        }
-
-                        fields = getAttrFieldsForType(parent);
-                        field = fields.get(c.getName());
-                    }
-                }
-                // if it's a 'basic' type we directly use setter
-                type = field == null ? type : field.getType();
-                if (isBasicType(type)) {
-                    if (i < cs.size() - 1) {
-                        throw new AttributeException(attr.toString(), "Attribute is of primitive type, and can't be nested further: " + c);
-                    }
-
-                    try {
-                        Object val = convertValueToType(item.getValue(), type);
-                        field.set(nested, val);
-                    } catch (Exception e) {
-                        throw new AttributeException(attr.toString(), "Failed to set attribute " + attr, e);
-                    }
-                } else if (isListType(type)) {
-                    if (i < cs.size() -1) {
-                        // not the target component
-                        try {
-                            nested = field.get(nested);
-                        } catch (Exception e) {
-                            throw new AttributeException(attr.toString(), "Failed to get attribute \"" + c + "\" in " + attr, e);
-                        }
-                        if (c.getIndex() >= 0) {
-                            // list item
-                            // get idx-th item
-                            List l = (List) nested;
-                            if (c.getIndex() >= l.size()) {
-                                throw new AttributeException(attr.toString(), "Array index out of bounds for \"" + c + "\" in " + attr);
-                            }
-                            nested = l.get(c.getIndex());
-                        }
+            JsonNode destNode = dest.get(name);
+            if (destNode != null) {
+                if (destNode.isObject()) {
+                    if (node.isObject()) {
+                        merge((ObjectNode) node, (ObjectNode) destNode);
                     } else {
-                        // target component
-                        Class itype = type;
-                        Type gtype = field.getGenericType();
-                        if (gtype instanceof ParameterizedType) {
-                            Type[] typeArgs = ((ParameterizedType) gtype).getActualTypeArguments();
-                            if (typeArgs.length >= 1 && typeArgs[0] instanceof Class) {
-                                itype = (Class) typeArgs[0];
-                            } else {
-                                itype = String.class;
-                            }
-                        }
-                        if (c.getIndex() >= 0 || attr.isAppend()) {
-                            // some list item
-                            // get the list first
-                            List target;
-                            try {
-                                target = (List) field.get(nested);
-                            } catch (Exception e) {
-                                throw new AttributeException(attr.toString(), "Failed to get list attribute: " + attr, e);
-                            }
-
-                            // now replace or add idx-th item
-                            if (target == null) {
-                                target = createNewList(type);
-                                try {
-                                    field.set(nested, target);
-                                } catch (Exception e) {
-                                    throw new AttributeException(attr.toString(), "Failed to set list attribute " + attr, e);
-                                }
-                            }
-                            if (c.getIndex() >= target.size()) {
-                                throw new AttributeException(attr.toString(), "Array index out of bounds for \"" + c + "\" in " + attr);
-                            }
-
-                            if (attr.isAppend()) {
-                                try {
-                                    Object value = convertValueToType(item.getValue(), itype);
-                                    if (c.getIndex() >= 0) {
-                                        target.add(c.getIndex(), value);
-                                    } else {
-                                        target.add(value);
-                                    }
-                                } catch (Exception e) {
-                                    throw new AttributeException(attr.toString(), "Failed to set list attribute " + attr, e);
-                                }
-
-                            } else {
-                                if (item.getType() == SET) {
-                                    try {
-                                        Object value = convertValueToType(item.getValue(), itype);
-                                        target.set(c.getIndex(), value);
-                                    } catch (Exception e) {
-                                        throw new AttributeException(attr.toString(), "Failed to set list attribute " + attr, e);
-                                    }
-                                } else {
-                                    try {
-                                        target.remove(c.getIndex());
-                                    } catch (Exception e) {
-                                        throw new AttributeException(attr.toString(), "Failed to remove list attribute " + attr, e);
-                                    }
-                                }
-                            }
-
-                        } else {
-                            // set the whole list field itself
-                            List value = createNewList(type);;
-                            if (item.getType() == SET) {
-                                List converted = convertValueToList(item.getValue(), itype);
-                                value.addAll(converted);
-                            }
-                            try {
-                                field.set(nested, value);
-                            } catch (Exception e) {
-                                throw new AttributeException(attr.toString(), "Failed to set list attribute " + attr, e);
-                            }
-                        }
+                        throw new RuntimeException("Attribute is of incompatible type - " + name + ": " + node);
+                    }
+                } else if (destNode.isArray()) {
+                    if (node.isArray()) {
+                        dest.set(name, node);
+                    } else {
+                        throw new RuntimeException("Attribute is of incompatible type - " + name + ": " + node);
                     }
                 } else {
-                    // object type
-                    if (i < cs.size() -1) {
-                        // not the target component
-                        Object value;
-                        if (field == null) {
-                            if (isMapType(nested.getClass())) {
-                                value = ((Map) nested).get(c.getName());
-                            } else {
-                                throw new RuntimeException("Unexpected condition while processing: " + attr);
-                            }
-                        } else {
-                            try {
-                                value = field.get(nested);
-                            } catch (Exception e) {
-                                throw new AttributeException(attr.toString(), "Failed to get attribute \"" + c + "\" in " + attr, e);
-                            }
-                        }
-                        if (value == null) {
-                            // create the target attribute
-                            if (isMapType(nested.getClass())) {
-                                throw new RuntimeException("Creating nested object trees not supported");
-                            } else {
-                                try {
-                                    value = createNewObject(type);
-                                    field.set(nested, value);
-                                } catch (Exception e) {
-                                    throw new AttributeException(attr.toString(), "Failed to set attribute " + attr, e);
-                                }
-                            }
-                        }
-                        nested = value;
-                    } else {
-                        // target component
-                        // todo implement map put
-                        if (isMapType(nested.getClass())) {
-                            try {
-                                ((Map) nested).put(c.getName(), item.getValue());
-                            } catch (Exception e) {
-                                throw new AttributeException(attr.toString(), "Failed to set map key " + attr, e);
-                            }
-                        } else {
-                            try {
-                                Object value = convertValueToType(item.getValue(), type);
-                                field.set(nested, value);
-                            } catch (Exception e) {
-                                throw new AttributeException(attr.toString(), "Failed to set attribute " + attr, e);
-                            }
-                        }
-                    }
+                    dest.set(name, node);
                 }
-            }
-        }
-    }
-
-    private static Object createNewObject(Class type) throws Exception {
-        return type.newInstance();
-    }
-
-    public static List createNewList(Class type) {
-
-        if (type == List.class) {
-            return new ArrayList();
-        } else if (type.isInterface()) {
-            throw new RuntimeException("Can't instantiate a list type: " + type);
-        }
-
-        try {
-            return (List) type.newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to instantiate a list type: " + type, e);
-        }
-    }
-
-    public static List convertValueToList(String value, Class itemType) {
-        try {
-            List result = new LinkedList();
-            if (!value.startsWith("[")) {
-                throw new RuntimeException("List attribute value has to start with '[' - '" + value + "'");
-            }
-            List parsed = JsonSerialization.readValue(value, List.class);
-            for (Object item: parsed) {
-                if (itemType.isAssignableFrom(item.getClass())) {
-                    result.add(item);
-                } else {
-                    result.add(convertValueToType(item, itemType));
-                }
-            }
-            return result;
-
-        } catch (JsonParseException e) {
-            throw new RuntimeException("Failed to parse list value: " + e.getMessage(), e);
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to parse list value: " + value, e);
-        }
-    }
-
-    public static <T> void merge(T source, T dest) {
-        // Use existing index for type, then iterate over all attributes and
-        // use setter on dest, and getter on source to copy value over
-        Map<String, Field> fieldMap = getAttrFieldsForType(source.getClass());
-        try {
-            for (String attrName : fieldMap.keySet()) {
-                Field field = fieldMap.get(attrName);
-                Object localValue = field.get(source);
-                if (localValue != null) {
-                    field.set(dest, localValue);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to merge changes", e);
-        }
-    }
-
-
-    public static LinkedHashMap<String, String> getAttributeListWithJSonTypes(Class type, AttributeKey attr) {
-
-        LinkedHashMap<String, String> result = new LinkedHashMap<>();
-        attr = attr != null ? attr : new AttributeKey();
-
-        Map<String, Field> fields = getAttrFieldsForType(type);
-        for (AttributeKey.Component c: attr.getComponents()) {
-            Field f = fields.get(c.getName());
-            if (f == null) {
-                throw new AttributeException(attr.toString(), "No such attribute: " + attr);
-            }
-
-            type = f.getType();
-            if (isBasicType(type) || isListType(type) || isMapType(type)) {
-                return result;
             } else {
-                fields = getAttrFieldsForType(type);
+                dest.set(name, node);
             }
-        }
-
-        for (Map.Entry<String, Field> item : fields.entrySet()) {
-            String key = item.getKey();
-            Class clazz = item.getValue().getType();
-            String t = getTypeString(clazz, item.getValue());
-
-            result.put(key, t);
-        }
-        return result;
-    }
-
-    public static Field resolveField(Class type, AttributeKey attr) {
-        Field f = null;
-        Type gtype = type;
-
-        for (AttributeKey.Component c: attr.getComponents()) {
-            if (f != null) {
-                gtype = f.getGenericType();
-                if (gtype instanceof ParameterizedType) {
-                    Type[] typeargs = ((ParameterizedType) gtype).getActualTypeArguments();
-                    if (typeargs.length > 0) {
-                        gtype = typeargs[typeargs.length-1];
-                    }
-                }
-            }
-            Map<String, Field> fields = getAttrFieldsForType(gtype);
-            f = fields.get(c.getName());
-            if (f == null) {
-                throw new AttributeException(attr.toString(), "No such attribute: " + attr);
-            }
-        }
-        return f;
-    }
-
-    public static String getTypeString(Type type, Field field) {
-        Class clazz = null;
-        if (type == null) {
-            if (field == null) {
-                throw new IllegalArgumentException("type == null and field == null");
-            }
-            type = field.getGenericType();
-        }
-        if (type instanceof Class) {
-            clazz = (Class) type;
-        } else if (type instanceof ParameterizedType) {
-            StringBuilder sb = new StringBuilder();
-            String rtype = getTypeString(((ParameterizedType) type).getRawType(), null);
-
-            sb.append(rtype);
-            sb.append(" ").append("(");
-            Type[] typeArgs = ((ParameterizedType) type).getActualTypeArguments();
-
-            for (int i = 0; i < typeArgs.length; i++) {
-                if (i > 0) {
-                    sb.append(", ");
-                }
-                sb.append(getTypeString(typeArgs[i], null));
-            }
-            sb.append(")");
-            return sb.toString();
-        }
-
-        if (CharSequence.class.isAssignableFrom(clazz)) {
-            return "string";
-        } else if (Integer.class.isAssignableFrom(clazz) || int.class.isAssignableFrom(clazz)) {
-            return "int";
-        } else if (Long.class.isAssignableFrom(clazz) || long.class.isAssignableFrom(clazz)) {
-            return "long";
-        } else if (Float.class.isAssignableFrom(clazz) || float.class.isAssignableFrom(clazz)) {
-            return "float";
-        } else if (Double.class.isAssignableFrom(clazz) || double.class.isAssignableFrom(clazz)) {
-            return "double";
-        } else if (Number.class.isAssignableFrom(clazz)) {
-            return "number";
-        } else if (Boolean.class.isAssignableFrom(clazz) || boolean.class.isAssignableFrom(clazz)) {
-            return "boolean";
-        } else if (isListType(clazz)) {
-            if (field != null) {
-                Type gtype = field.getGenericType();
-                if (gtype == clazz && clazz.isArray()) {
-                    return "array (" + getTypeString(clazz.getComponentType(), null) + ")";
-                }
-                return getTypeString(gtype, null);
-            }
-            return "array";
-        } else if (isMapType(clazz)) {
-            if (field != null) {
-                Type gtype = field.getGenericType();
-                return getTypeString(gtype, null);
-            }
-            return "object";
-        } else {
-            return "object";
         }
     }
 }

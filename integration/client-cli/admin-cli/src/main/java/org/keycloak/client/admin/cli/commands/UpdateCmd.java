@@ -17,10 +17,7 @@
 
 package org.keycloak.client.admin.cli.commands;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jboss.aesh.cl.Arguments;
 import org.jboss.aesh.cl.CommandDefinition;
@@ -28,11 +25,9 @@ import org.jboss.aesh.cl.Option;
 import org.jboss.aesh.console.command.CommandException;
 import org.jboss.aesh.console.command.CommandResult;
 import org.jboss.aesh.console.command.invocation.CommandInvocation;
-import org.keycloak.admin.client.Keycloak;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.common.CmdStdinContext;
 import org.keycloak.client.admin.cli.config.ConfigData;
-import org.keycloak.client.admin.cli.operations.ResourceHandler;
 import org.keycloak.client.admin.cli.util.AccessibleBufferOutputStream;
 import org.keycloak.client.admin.cli.util.HeadersBody;
 import org.keycloak.client.admin.cli.util.HeadersBodyStatus;
@@ -40,7 +35,6 @@ import org.keycloak.client.admin.cli.util.HttpUtil;
 import org.keycloak.client.admin.cli.util.Pair;
 import org.keycloak.client.admin.cli.util.ReflectionUtil;
 import org.keycloak.client.admin.cli.util.ReturnFields;
-import org.keycloak.util.JsonSerialization;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;
@@ -63,6 +57,7 @@ import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.DEFAULT_CONFIG_FILE_STRING;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.credentialsAvailable;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
+import static org.keycloak.client.admin.cli.util.HttpUtil.composeResourceUrl;
 import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
 import static org.keycloak.client.admin.cli.util.IoUtil.printErr;
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
@@ -93,7 +88,7 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
     String fields;
 
     @Option(shortName = 'H', name = "print-headers", description = "Print response headers", hasValue = false)
-    boolean printHeaders ;
+    boolean printHeaders;
 
     @Option(shortName = 'm', name = "merge", description = "Merge new values with existing configuration on the server", hasValue = false)
     boolean mergeMode = true;
@@ -252,7 +247,7 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
         }
 
         if (mergeMode) {
-            Object result;
+            ObjectNode result;
             HeadersBodyStatus response;
             try {
                 response = HttpUtil.doRequest("get", resourceUrl, new HeadersBody(new LinkedList<>(headers.values())));
@@ -261,13 +256,13 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                 copyStream(response.getBody(), buffer);
 
-                result = MAPPER.readValue(buffer.toByteArray(), JsonNode.class);
+                result = MAPPER.readValue(buffer.toByteArray(), ObjectNode.class);
 
             } catch (IOException e) {
                 throw new RuntimeException("HTTP request error: " + e.getMessage(), e);
             }
 
-            CmdStdinContext ctxremote = new CmdStdinContext();
+            CmdStdinContext<ObjectNode> ctxremote = new CmdStdinContext<>();
             ctxremote.setResult(result);
 
             // merge local representation over remote one
@@ -326,28 +321,22 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
             printOut("");
         }
 
-        String location = response.getHeader("Location");
         if (pretty || returnFields != null) {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             copyStream(response.getBody(), buffer);
 
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.enable(SerializationFeature.INDENT_OUTPUT);
-            mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
             try {
-                JsonNode rootNode = mapper.readValue(buffer.toByteArray(), JsonNode.class);
+                JsonNode rootNode = MAPPER.readValue(buffer.toByteArray(), JsonNode.class);
                 if (returnFields != null) {
-                    rootNode = applyFieldFilter(mapper, rootNode, returnFields);
+                    rootNode = applyFieldFilter(MAPPER, rootNode, returnFields);
                 }
                 // now pretty print it to output
-                mapper.writeValue(abos, rootNode);
+                MAPPER.writeValue(abos, rootNode);
             } catch (Exception ignored) {
                 copyStream(new ByteArrayInputStream(buffer.toByteArray()), abos);
             }
         } else {
-            //copyStream(response.getBody(), abos);
-            String id = location != null ? ("'" + extractLastComponentOfUri(location) + "'") : "unknown";
-            printErr("Created new " + typeName + " with id " + id);
+            copyStream(response.getBody(), abos);
         }
 
         int lastByte = abos.getLastByte();
@@ -356,21 +345,6 @@ public class UpdateCmd extends AbstractAuthOptionsCmd {
         }
 
         return CommandResult.SUCCESS;
-    }
-
-    private void outputResult(ResourceHandler handler, Keycloak client, String realm, String id) {
-        if (outputResult) {
-            Object result = handler.get(client, realm, id);
-            try {
-                if (compressed) {
-                    printOut(JsonSerialization.writeValueAsString(result));
-                } else {
-                    printOut(JsonSerialization.writeValueAsPrettyString(result));
-                }
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to print result as JSON " + result);
-            }
-        }
     }
 
     @Override

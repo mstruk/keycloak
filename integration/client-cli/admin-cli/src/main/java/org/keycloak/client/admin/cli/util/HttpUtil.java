@@ -38,7 +38,6 @@ import org.apache.http.ssl.SSLContexts;
 import org.keycloak.util.JsonSerialization;
 
 import javax.net.ssl.SSLContext;
-import javax.ws.rs.core.Response;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -49,10 +48,9 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
@@ -251,14 +249,7 @@ public class HttpUtil {
         return null;
     }
 
-    public static void checkStatusCreated(Response response) {
-        checkStatus(response, Response.Status.CREATED.getStatusCode());
-    }
-
-    public static void checkStatusNoContent(Response response) {
-        checkStatus(response, Response.Status.NO_CONTENT.getStatusCode());
-    }
-
+/*
     public static void checkStatus(Response response, int expected) {
         if (response.getStatus() != expected) {
             Object body = response.getEntity();
@@ -272,5 +263,58 @@ public class HttpUtil {
             }
             throw new RuntimeException(err);
         }
+    }
+*/
+
+    public static String addQueryParamsToUri(String uri, String ... queryParams) {
+        if (queryParams == null) {
+            return uri;
+        }
+
+        if (queryParams.length % 2 != 0) {
+            throw new RuntimeException("Value missing for query parameter: " + queryParams[queryParams.length-1]);
+        }
+
+        Map<String, String> params = new LinkedHashMap<>();
+        for (int i = 0; i < queryParams.length; i += 2) {
+            params.put(queryParams[i], queryParams[i+1]);
+        }
+        return addQueryParamsToUri(uri, params);
+    }
+
+    public static String addQueryParamsToUri(String uri, Map<String, String> queryParams) {
+
+        if (queryParams.size() == 0) {
+            return uri;
+        }
+
+        StringBuilder query = new StringBuilder();
+        for (Map.Entry<String, String> params: queryParams.entrySet()) {
+            try {
+                if (query.length() > 0) {
+                    query.append("&");
+                }
+                query.append(params.getKey()).append("=").append(URLEncoder.encode(params.getValue(), "utf-8"));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to encode query params: " + params.getKey() + "=" + params.getValue());
+            }
+        }
+
+        return uri + (uri.indexOf("?") == -1 ? "?" : "&") + query;
+    }
+
+    public static String composeResourceUrl(String adminRoot, String realm, String uri) {
+        if (!uri.startsWith("http:")) {
+            if ("realms".equals(uri) || uri.startsWith("realms/")) {
+                uri = normalize(adminRoot) + uri;
+            } else {
+                uri = normalize(adminRoot) + "realms/" + realm + "/" + uri;
+            }
+        }
+        return uri;
+    }
+
+    public static String normalize(String value) {
+        return value.endsWith("/") ? value : value + "/";
     }
 }

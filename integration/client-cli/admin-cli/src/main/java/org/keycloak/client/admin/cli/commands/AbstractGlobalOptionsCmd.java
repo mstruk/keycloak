@@ -27,6 +27,7 @@ import org.keycloak.client.admin.cli.util.ReturnFields;
 import java.io.IOException;
 import java.util.Iterator;
 
+import static org.keycloak.client.admin.cli.util.HttpUtil.normalize;
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
 
 /**
@@ -66,24 +67,10 @@ public abstract class AbstractGlobalOptionsCmd implements Command {
         return KcAdmCmd.usage();
     }
 
-    protected String composeResourceUrl(String adminRoot, String realm, String uri) {
-        if (!uri.startsWith("http:")) {
-            if ("realms".equals(uri) || uri.startsWith("realms/")) {
-                uri = normalize(adminRoot) + uri;
-            } else {
-                uri = normalize(adminRoot) + "realms/" + realm + "/" + uri;
-            }
-        }
-        return uri;
-    }
-
     protected String composeAdminRoot(String server) {
         return normalize(server) + "admin";
     }
 
-    protected String normalize(String value) {
-        return value.endsWith("/") ? value : value + "/";
-    }
 
     protected void requireValue(Iterator<String> it, String option) {
         if (!it.hasNext()) {

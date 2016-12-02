@@ -23,28 +23,22 @@ import org.jboss.aesh.console.command.Command;
 import org.jboss.aesh.console.command.CommandException;
 import org.jboss.aesh.console.command.CommandResult;
 import org.jboss.aesh.console.command.invocation.CommandInvocation;
-import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.config.ConfigData;
 import org.keycloak.client.admin.cli.operations.ClientOperations;
 import org.keycloak.client.admin.cli.operations.RoleOperations;
 import org.keycloak.client.admin.cli.operations.RoleSearch;
 import org.keycloak.client.admin.cli.operations.UserOperations;
-import org.keycloak.client.admin.cli.util.ConfigUtil;
-import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
-import org.keycloak.representations.idm.UserRepresentation;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
+import static org.keycloak.client.admin.cli.operations.UserOperations.getIdFromUsername;
 import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.credentialsAvailable;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
@@ -56,6 +50,9 @@ import static org.keycloak.client.admin.cli.util.OsUtil.EOL;
  */
 @CommandDefinition(name = "add-role", description = "[ARGUMENTS]")
 public class AddRoleCmd extends AbstractAuthOptionsCmd implements Command {
+
+    @Option(shortName = 'a', name = "admin-root", description = "URL of Admin REST endpoint root - e.g. http://localhost:8080/auth/admin", hasValue = true)
+    String adminRestRoot;
 
     @Option(name = "username", description = "Read object from file or standard input if FILENAME is set to '-'", hasValue = true)
     String username;
@@ -79,7 +76,6 @@ public class AddRoleCmd extends AbstractAuthOptionsCmd implements Command {
     @Override
     public CommandResult execute(CommandInvocation commandInvocation) throws CommandException, InterruptedException {
 
-        List<AttributeOperation> attrs = new LinkedList<>();
         List<String> roleNames = new LinkedList<>();
         List<String> roleIds = new LinkedList<>();
 
@@ -139,60 +135,29 @@ public class AddRoleCmd extends AbstractAuthOptionsCmd implements Command {
             auth = auth != null ? "Bearer " + auth : null;
 
             final String server = config.getServerUrl();
-            final String clientId = ConfigUtil.getEffectiveClientId(config);
             final String realm = getTargetRealm(config);
-
-
-            // Initialize admin client Keycloak object
-            // delegate to resource type create method
-            Keycloak client = KeycloakBuilder.builder()
-                    .serverUrl(server)
-                    .realm(realm)
-                    .clientId(clientId)
-                    .authorization(auth)
-                    .build();
-
-            UserRepresentation userRepresentation;
+            final String adminRoot = adminRestRoot != null ? adminRestRoot : composeAdminRoot(server);
 
             // if username is specified resolve id
             if (username != null) {
-                Map<String, String> filter = new HashMap<>();
-                filter.put("username", username);
-
-                List<UserRepresentation> users = UserOperations.getAllFiltered(client, realm, 0, 2, filter);
-                if (users.size() > 1) {
-                    throw new RuntimeException("Multiple users found for username: " + username + ". Use --userid to specify user.");
-                }
-
-                if (users.size() == 0) {
-                    throw new RuntimeException("User not found for username: " + username);
-                }
-                userRepresentation = users.get(0);
-            } else {
-                userRepresentation = UserOperations.get(client, realm, userid);
-                if (userRepresentation == null) {
-                    throw new RuntimeException("User not found for id: " + userid);
-                }
+                userid = getIdFromUsername(adminRoot, realm, auth, username);
             }
 
-            List<RoleRepresentation> roles;
 
             if (clientid != null) {
-                ClientRepresentation clientRepresentation = ClientOperations.getByClientId(client, realm, clientid);
-                if (clientRepresentation == null) {
-                    throw new RuntimeException("Client not found for clientId: " + clientid);
-                }
-                Set<RoleRepresentation> rolesToAdd = getRoleRepresentations(roleNames, roleIds,
-                        new RoleSearch(ClientOperations.getRoles(client, realm, clientRepresentation)));
+                String idOfClient = ClientOperations.getIdFromClientId(adminRoot, realm, auth, clientid);
+
+                List<RoleRepresentation> roles = ClientOperations.getRolesForClient(adminRoot, realm, auth, idOfClient);
+                Set<RoleRepresentation> rolesToAdd = getRoleRepresentations(roleNames, roleIds, new RoleSearch(roles));
 
                 // now add all the roles
-                UserOperations.addClientRoles(client, realm, userRepresentation.getId(), clientRepresentation.getId(), new ArrayList<>(rolesToAdd));
+                UserOperations.addClientRoles(adminRoot, realm, auth, userid, idOfClient, new ArrayList<>(rolesToAdd));
             } else {
                 Set<RoleRepresentation> rolesToAdd = getRoleRepresentations(roleNames, roleIds,
-                        new RoleSearch(RoleOperations.getAll(client, realm)));
+                        new RoleSearch(RoleOperations.getRealmRoles(adminRoot, realm, auth)));
 
                 // now add all the roles
-                UserOperations.addRoles(client, realm, userRepresentation.getId(), new ArrayList<>(rolesToAdd));
+                UserOperations.addRealmRoles(adminRoot, realm, auth, userid, new ArrayList<>(rolesToAdd));
             }
             return CommandResult.SUCCESS;
 

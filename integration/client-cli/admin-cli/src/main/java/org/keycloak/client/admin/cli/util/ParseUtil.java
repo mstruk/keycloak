@@ -18,16 +18,12 @@
 package org.keycloak.client.admin.cli.util;
 
 import com.fasterxml.jackson.core.JsonParseException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.exc.UnrecognizedPropertyException;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.keycloak.client.admin.cli.common.AttributeOperation;
 import org.keycloak.client.admin.cli.common.CmdStdinContext;
-import org.keycloak.client.admin.cli.operations.ResourceType;
 import org.keycloak.util.JsonSerialization;
 
 import java.io.IOException;
-import java.lang.reflect.Constructor;
 import java.util.List;
 
 import static org.keycloak.client.admin.cli.util.IoUtil.readFileOrStdin;
@@ -109,22 +105,5 @@ public class ParseUtil {
         ctx.setContent(content);
         ctx.setResult(result);
         return ctx;
-    }
-
-    public static ResourceType checkResourceType(String option) {
-        //switch (option) {
-        //    case "realm":
-        //    case "user":
-        //    case "role":
-        //    case "client":
-        //    case "realms":
-        //    case "users":
-        //    case "roles":
-        //    case "clients":
-        //    case "available-roles":
-                return ResourceType.fromTypeName(option);
-        //    default:
-        //        throw new RuntimeException("Unsupported resource: " + option);
-        //}
     }
 }

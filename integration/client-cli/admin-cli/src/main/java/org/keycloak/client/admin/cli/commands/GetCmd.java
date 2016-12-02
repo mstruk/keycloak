@@ -49,6 +49,7 @@ import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.DEFAULT_CONFIG_FILE_STRING;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.credentialsAvailable;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
+import static org.keycloak.client.admin.cli.util.HttpUtil.composeResourceUrl;
 import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
 import static org.keycloak.client.admin.cli.util.IoUtil.printErr;
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
@@ -85,10 +86,10 @@ public class GetCmd extends AbstractAuthOptionsCmd {
     boolean compressed = false;
 
     @Option(shortName = 'o', name = "offset", description = "Number of results from beginning of resultset to skip", hasValue = true)
-    int offset = 0;
+    Integer offset;
 
-    @Option(shortName = 'l', name = "limit", description = "Maksimum number of results to return", hasValue = true, defaultValue = "1000")
-    int limit = 1000;
+    @Option(shortName = 'l', name = "limit", description = "Maksimum number of results to return", hasValue = true)
+    Integer limit;
 
     @Option(name = "format", description = "Output format - one of: json, csv", hasValue = true, defaultValue = "json")
     String format;
@@ -201,6 +202,21 @@ public class GetCmd extends AbstractAuthOptionsCmd {
 
         String resourceUrl = composeResourceUrl(adminRoot, realm, url);
         String typeName = extractTypeNameFromUri(resourceUrl);
+
+        LinkedHashMap<String, String> queryParams = new LinkedHashMap<>();
+        if (offset != null) {
+            queryParams.put("first", String.valueOf(offset));
+        }
+        if (limit != null) {
+            queryParams.put("max", String.valueOf(limit));
+        }
+        if (queryParams.size() > 0) {
+            resourceUrl = HttpUtil.addQueryParamsToUri(resourceUrl, queryParams);
+        }
+
+        if (filter.size() > 0) {
+            resourceUrl = HttpUtil.addQueryParamsToUri(resourceUrl, filter);
+        }
 
         HeadersBodyStatus response;
         try {

@@ -16,43 +16,53 @@
  */
 package org.keycloak.client.admin.cli.operations;
 
-import org.keycloak.admin.client.Keycloak;
+import org.keycloak.client.admin.cli.util.HeadersBody;
+import org.keycloak.client.admin.cli.util.HeadersBodyStatus;
+import org.keycloak.client.admin.cli.util.HttpUtil;
+import org.keycloak.client.admin.cli.util.Pair;
 import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.util.JsonSerialization;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
+
+import static org.keycloak.client.admin.cli.util.HttpUtil.composeResourceUrl;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
  */
 public class RoleOperations {
 
-    public static String create(Keycloak client, String realm, RoleRepresentation role) {
-        client.realm(realm).roles().create(role);
-        return role.getName();
-    }
+    public static class LIST_OF_ROLES extends ArrayList<RoleRepresentation>{};
 
-    public static RoleRepresentation get(Keycloak client, String realm, String name) {
-        return client.realm(realm).roles().get(name).toRepresentation();
-    }
+    public static List<RoleRepresentation> getRealmRoles(String rootUrl, String realm, String auth) {
+        String resourceUrl = composeResourceUrl(rootUrl, realm, "/roles");
 
-    public static List<RoleRepresentation> getAll(Keycloak client, String realm) {
-        return client.realm(realm).roles().list();
-    }
+        LinkedList<Pair> headers = new LinkedList<>();
+        if (auth != null) {
+            headers.add(new Pair("Authorization", auth));
+        }
+        headers.add(new Pair("Accept", "application/json"));
 
-    public static List<RoleRepresentation> getClientRolesForUser(Keycloak client, String realm, String userid, String clientid) {
-        return client.realm(realm).users().get(userid).roles().clientLevel(clientid).listAll();
-    }
+        HeadersBodyStatus response;
+        try {
+            response = HttpUtil.doRequest("get", resourceUrl, new HeadersBody(headers));
+        } catch (IOException e) {
+            throw new RuntimeException("HTTP request failed: GET " + resourceUrl, e);
+        }
 
-    public static List<RoleRepresentation> getAvailableClientRolesForUser(Keycloak client, String realm, String userid, String clientid) {
-        return client.realm(realm).users().get(userid).roles().clientLevel(clientid).listAvailable();
-    }
+        response.checkSuccess();
 
-    public static void update(Keycloak client, String realm, RoleRepresentation role) {
-        client.realm(realm).roles().get(role.getName()).update(role);
-    }
+        List<RoleRepresentation> roles;
+        try {
+            roles = JsonSerialization.readValue(response.getBody(), LIST_OF_ROLES.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read JSON response", e);
+        }
 
-    public static void delete(Keycloak client, String realm, String name) {
-        client.realm(realm).roles().deleteRole(name);
+        return roles;
     }
 
 }

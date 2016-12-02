@@ -45,7 +45,7 @@ public class HeadersBodyStatus extends HeadersBody {
     public void checkSuccess() {
         int code = Integer.valueOf(status.split(" ")[1]);
         if (code < 200 || code >= 300) {
-            String content = bodyString();
+            String content = readBodyString();
             Map<String, String> error = null;
             try {
                 error = JsonSerialization.readValue(content, Map.class);

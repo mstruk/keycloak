@@ -1,9 +1,6 @@
 package org.keycloak.client.admin.cli.commands;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.jboss.aesh.cl.Arguments;
 import org.jboss.aesh.cl.CommandDefinition;
@@ -42,6 +39,7 @@ import static org.keycloak.client.admin.cli.util.AuthUtil.ensureToken;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.DEFAULT_CONFIG_FILE_STRING;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.credentialsAvailable;
 import static org.keycloak.client.admin.cli.util.ConfigUtil.loadConfig;
+import static org.keycloak.client.admin.cli.util.HttpUtil.composeResourceUrl;
 import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
 import static org.keycloak.client.admin.cli.util.IoUtil.printErr;
 import static org.keycloak.client.admin.cli.util.IoUtil.printOut;
@@ -273,16 +271,13 @@ public class CreateCmd extends AbstractAuthOptionsCmd implements Command {
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             copyStream(response.getBody(), buffer);
 
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.enable(SerializationFeature.INDENT_OUTPUT);
-            mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
             try {
-                JsonNode rootNode = mapper.readValue(buffer.toByteArray(), JsonNode.class);
+                JsonNode rootNode = MAPPER.readValue(buffer.toByteArray(), JsonNode.class);
                 if (returnFields != null) {
-                    rootNode = applyFieldFilter(mapper, rootNode, returnFields);
+                    rootNode = applyFieldFilter(MAPPER, rootNode, returnFields);
                 }
                 // now pretty print it to output
-                mapper.writeValue(abos, rootNode);
+                MAPPER.writeValue(abos, rootNode);
             } catch (Exception ignored) {
                 copyStream(new ByteArrayInputStream(buffer.toByteArray()), abos);
             }

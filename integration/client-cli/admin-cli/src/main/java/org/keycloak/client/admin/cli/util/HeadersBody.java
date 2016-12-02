@@ -19,6 +19,7 @@ package org.keycloak.client.admin.cli.util;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.LinkedList;
 import java.util.List;
 
 import static org.keycloak.client.admin.cli.util.IoUtil.copyStream;
@@ -49,10 +50,15 @@ public class HeadersBody {
         return body;
     }
 
-    public String bodyString() {
+    public String readBodyString() {
+        byte [] buffer = readBodyBytes();
+        return new String(buffer, Charset.forName(getContentCharset()));
+    }
+
+    public byte[] readBodyBytes() {
         ByteArrayOutputStream os = new ByteArrayOutputStream();
         copyStream(getBody(), os);
-        return new String(os.toByteArray(), Charset.forName(getContentCharset()));
+        return os.toByteArray();
     }
 
     public String getHeader(String name) {
@@ -74,6 +80,4 @@ public class HeadersBody {
         }
         return "iso-8859-1";
     }
-
-
 }

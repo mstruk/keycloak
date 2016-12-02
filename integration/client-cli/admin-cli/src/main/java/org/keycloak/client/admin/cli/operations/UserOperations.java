@@ -1,111 +1,132 @@
 package org.keycloak.client.admin.cli.operations;
 
-import org.keycloak.admin.client.Keycloak;
+import org.keycloak.client.admin.cli.util.HeadersBody;
+import org.keycloak.client.admin.cli.util.HeadersBodyStatus;
 import org.keycloak.client.admin.cli.util.HttpUtil;
+import org.keycloak.client.admin.cli.util.Pair;
 import org.keycloak.representations.idm.CredentialRepresentation;
-import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.keycloak.util.JsonSerialization;
 
-import javax.ws.rs.core.Response;
-import java.util.HashMap;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
+
+import static org.keycloak.client.admin.cli.util.HttpUtil.composeResourceUrl;
 
 /**
  * @author <a href="mailto:mstrukel@redhat.com">Marko Strukelj</a>
  */
 public class UserOperations {
 
-    public static String create(Keycloak client, String realm, UserRepresentation user) {
-        Response response = client.realm(realm).users().create(user);
-        HttpUtil.checkStatusCreated(response);
-        return HttpUtil.extractIdFromLocation(response.getLocation().toString());
+    public static void addRealmRoles(String rootUrl, String realm, String auth, String userid, List<RoleRepresentation> roles) {
+        String resourceUrl = composeResourceUrl(rootUrl, realm, "users/" + userid + "/roles/role-mappings/realm");
+        addRoles(resourceUrl, auth, roles);
     }
 
-    public static UserRepresentation get(Keycloak client, String realm, String id) {
-        return client.realm(realm).users().get(id).toRepresentation();
+    public static void addClientRoles(String rootUrl, String realm, String auth, String userid, String idOfClient, List<RoleRepresentation> roles) {
+        String resourceUrl = composeResourceUrl(rootUrl, realm, "users/" + userid + "/roles/role-mappings/clients/" + idOfClient);
+        addRoles(resourceUrl, auth, roles);
     }
 
-    public static List<UserRepresentation> getAll(Keycloak client, String realm, int offset, int limit) {
-        return client.realm(realm).users().search(null, offset, limit);
-    }
+    public static void addRoles(String resourceUrl, String auth, List<RoleRepresentation> roles) {
 
-    public static UserRepresentation getByUsername(Keycloak client, String realm, String username) {
-        Map<String, String> filter = new HashMap<>();
-        filter.put("username", username);
-        List<UserRepresentation> result = getAllFiltered(client, realm, 0, 2, filter);
-        if (result.size() > 1) {
-            throw new RuntimeException("More that one user found for username: " + username);
+        LinkedList<Pair> headers = new LinkedList<>();
+        if (auth != null) {
+            headers.add(new Pair("Authorization", auth));
         }
-        return result.size() > 0 ? result.get(0) : null;
-    }
-    public static List<UserRepresentation> getAllFiltered(Keycloak client, String realm, int offset, int limit, Map<String, String> filter) {
-        String username = null;
-        String firstName = null;
-        String lastName = null;
-        String email = null;
-        String search = null;
+        headers.add(new Pair("Content-Type", "application/json"));
 
-        for (Map.Entry<String, String> item: filter.entrySet()) {
-            switch(item.getKey()) {
-                case "username":
-                    username = item.getValue();
-                    break;
-                case "firstName":
-                    firstName = item.getValue();
-                    break;
-                case "lastName":
-                    lastName = item.getValue();
-                    break;
-                case "email":
-                    email = item.getValue();
-                    break;
-                case "search":
-                case "":
-                    search = item.getValue();
-                    break;
-                default:
-                    throw new RuntimeException("Unsupported search parameter: " + item.getKey() + " (should be one of: username, firstName, lastName, email, search)");
-            }
+        HeadersBodyStatus response;
+
+        byte[] body;
+        try {
+            body = JsonSerialization.writeValueAsBytes(roles);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to serialize JSON", e);
         }
 
-        if (search != null && (username != null || firstName != null || lastName != null || email != null)) {
-            throw new RuntimeException("Incompatible search parameters - when 'search' is specified no other search parameter can be specified");
+        try {
+            response = HttpUtil.doRequest("post", resourceUrl, new HeadersBody(headers, new ByteArrayInputStream(body)));
+        } catch (IOException e) {
+            throw new RuntimeException("HTTP request failed: POST " + resourceUrl + "\n" + new String(body), e);
         }
 
-        if (username != null || firstName != null || lastName != null || email != null) {
-            return client.realm(realm).users().search(username, firstName, lastName, email, offset, limit);
-        } else {
-            return client.realm(realm).users().search(search, offset, limit);
+        response.checkSuccess();
+    }
+
+    public static void resetUserPassword(String rootUrl, String realm, String auth, String userid, String password, boolean temporary) {
+
+        String resourceUrl = composeResourceUrl(rootUrl, realm, "users/" + userid + "/reset-password");
+
+        LinkedList<Pair> headers = new LinkedList<>();
+        if (auth != null) {
+            headers.add(new Pair("Authorization", auth));
         }
-    }
+        headers.add(new Pair("Content-Type", "application/json"));
 
-    public static void update(Keycloak client, String realm, UserRepresentation user) {
-        if (user.getId() == null) {
-            throw new RuntimeException("User has no id set");
+        CredentialRepresentation credentials = new CredentialRepresentation();
+        credentials.setType("password");
+        credentials.setTemporary(temporary);
+        credentials.setValue(password);
+
+        HeadersBodyStatus response;
+
+        byte[] body;
+        try {
+            body = JsonSerialization.writeValueAsBytes(credentials);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to serialize JSON", e);
         }
-        client.realm(realm).users().get(user.getId()).update(user);
+
+        try {
+            response = HttpUtil.doRequest("put", resourceUrl, new HeadersBody(headers, new ByteArrayInputStream(body)));
+        } catch (IOException e) {
+            throw new RuntimeException("HTTP request failed: PUT " + resourceUrl + "\n" + new String(body), e);
+        }
+
+        response.checkSuccess();
     }
 
-    public static void delete(Keycloak client, String realm, String id) {
-        Response response = client.realm(realm).users().delete(id);
-        HttpUtil.checkStatusNoContent(response);
-    }
+    public static String getIdFromUsername(String rootUrl, String realm, String auth, String username) {
 
-    public static void addRoles(Keycloak client, String realm, String id, List<RoleRepresentation> roles) {
-        client.realm(realm).users().get(id).roles().realmLevel().add(roles);
-    }
+        String resourceUrl = composeResourceUrl(rootUrl, realm, "users");
 
-    public static void addClientRoles(Keycloak client, String realm, String id, String idOfClient, List<RoleRepresentation> roles) {
-        client.realm(realm).users().get(id).roles().clientLevel(idOfClient).add(roles);
-    }
+        resourceUrl = HttpUtil.addQueryParamsToUri(resourceUrl, "username", username, "first", "0", "max", "2");
 
-    public static void resetPassword(Keycloak client, String realm, UserRepresentation user, String password, boolean temporary) {
-        CredentialRepresentation creds = new CredentialRepresentation();
-        creds.setType("password");
-        creds.setValue(password);
-        creds.setTemporary(temporary);
-        client.realm(realm).users().get(user.getId()).resetPassword(creds);
+        LinkedList<Pair> headers = new LinkedList<>();
+        if (auth != null) {
+            headers.add(new Pair("Authorization", auth));
+        }
+        headers.add(new Pair("Accept", "application/json"));
+
+        HeadersBodyStatus response;
+        try {
+            response = HttpUtil.doRequest("get", resourceUrl, new HeadersBody(headers));
+        } catch (IOException e) {
+            throw new RuntimeException("HTTP request failed: GET " + resourceUrl, e);
+        }
+
+        response.checkSuccess();
+
+        List<UserRepresentation> users;
+        try {
+            users = JsonSerialization.readValue(response.getBody(), new ArrayList<UserRepresentation>(){}.getClass());
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read JSON response", e);
+        }
+
+        if (users.size() > 1) {
+            throw new RuntimeException("Multiple users found for username: " + username + ". Use --userid to specify user.");
+        }
+
+        if (users.size() == 0) {
+            throw new RuntimeException("User not found for username: " + username);
+        }
+
+        return users.get(0).getId();
     }
 }

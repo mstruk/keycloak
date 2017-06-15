@@ -418,15 +418,98 @@ and argument: `-p 8181`
 3) Run loadbalancer (class `SimpleUndertowLoadBalancer`) without arguments and system properties. Loadbalancer runs on port 8180, so you can access Keycloak on `http://localhost:8180/auth`     
 
 
-## Run Docker Authentication tests
+## Run Docker Authentication test
 
-First, validate that your machine has a valid docker installation and that it is available to the JVM running the tests.
+First, validate that your machine has a valid docker installation and that it is available to the JVM running the test.
+The exact steps to configure Docker depend on the operating system.
 
-Finally, run the tests:
+By default, the test will run against Undertow based embedded Keycloak Server, thus no distribution build is required beforehand.
+The exact command line arguments depend on the operating system.
 
-	mvn -f testsuite/integration-arquillian/tests/base/pom.xml \
-		clean test \
-		-Dtest=DockerClientTest \
-		-Dkeycloak.profile.feature.docker=enabled
+### General guidelines
 
-If you're running a Docker fork which doesn't have the default docker.io prefix for pulling images (e.g. RHEL Docker), use `-Ddocker.io-prefix-explicit=true` argument when running the tests.
+If docker daemon doesn't run locally, or if you're not running on Linux, you may need
+ to determine the IP of the bridge interface or local interface that Docker daemon can use to connect to Keycloak Server. 
+ Then specify that IP as additional system property called *host.ip*, for example:
+   
+    -Dhost.ip=192.168.64.1
+
+If using Docker for Mac, you can create an alias for your local network interface:
+
+    sudo ifconfig lo0 alias 10.200.10.1/24
+    
+Then pass the IP as *host.ip*:
+
+    -Dhost.ip=10.200.10.1
+
+
+If you're running a Docker fork that always lists a host component of an image on `docker images` (e.g. Fedora / RHEL Docker) 
+use `-Ddocker.io-prefix-explicit=true` argument when running the test.
+
+
+### Fedora
+
+On Fedora one way to set up Docker server is the following:
+
+    # install docker
+    sudo dnf install docker
+
+    # configure docker
+    # remove --selinux-enabled from OPTIONS
+    sudo vi /etc/sysconfig/docker
+
+    # start docker server
+    sudo systemctl start docker
+    
+    # use shell with 'root' privileges to run the test
+    sudo sh
+
+    # make sure Docker is available
+    docker pull registry:2
+
+
+Then, run the test passing `-Ddocker.io-prefix-explicit=true`:
+
+    mvn -f testsuite/integration-arquillian/tests/base/pom.xml \
+        clean test \
+        -Dtest=DockerClientTest \
+        -Dkeycloak.profile.feature.docker=enabled \
+        -Ddocker.io-prefix-explicit=true
+
+
+### macOS
+
+On macOS all you need to do is install Docker for Mac, start it up, and check that it works:
+
+    # make sure Docker is available
+    docker pull registry:2
+
+Be especially careful to restart Docker server after every sleep / suspend to ensure system clock of Docker VM is synchronized with
+that of the host operating system - Docker for Mac runs inside a VM.
+
+
+Then, run the test passing `-Dhost.ip=IP` where IP corresponds to en0 interface or an alias for localhost:
+
+    mvn -f testsuite/integration-arquillian/tests/base/pom.xml \
+        clean test \
+        -Dtest=DockerClientTest \
+        -Dkeycloak.profile.feature.docker=enabled \
+        -Dhost.ip=10.200.10.1
+
+
+
+### Running Docker test against Keycloak Server distribution
+
+Make sure to build the distribution:
+
+    mvn clean install -f distribution
+    
+Then, before running the test, setup Keycloak Server distribution for the tests:
+
+    mvn -f testsuite/integration-arquillian/servers/pom.xml \
+        clean install \
+        -Pauth-server-wildfly
+
+When running the test, add the following arguments to the command line:
+
+    -Pauth-server-wildfly -Pauth-server-enable-disable-feature -Dfeature.name=docker -Dfeature.value=enabled

@@ -1,5 +1,6 @@
 package org.keycloak.testsuite.docker;
 
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.keycloak.common.Profile;
@@ -13,6 +14,7 @@ import org.testcontainers.containers.Container;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
+import org.testcontainers.shaded.com.github.dockerjava.api.model.ContainerNetwork;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,13 +37,15 @@ public class DockerClientTest extends AbstractKeycloakTest {
     public static final String DOCKER_USER = "docker-user";
     public static final String DOCKER_USER_PASSWORD = "password";
 
-    public static final String REGISTRY_HOSTNAME = "localhost";
+    public static final String REGISTRY_HOSTNAME = "registry.localdomain";
     public static final Integer REGISTRY_PORT = 5000;
     public static final String MINIMUM_DOCKER_VERSION = "1.8.0";
     public static final String IMAGE_NAME = "busybox";
 
     private GenericContainer dockerRegistryContainer = null;
     private GenericContainer dockerClientContainer = null;
+
+    private static String hostIp;
 
     @BeforeClass
     public static void verifyEnvironment() {
@@ -51,6 +55,16 @@ public class DockerClientTest extends AbstractKeycloakTest {
         assumeTrue("Could not determine docker version for host machine.  It either is not present or accessible to the JVM running the test harness.", dockerVersion.isPresent());
         assumeTrue("Docker client on host machine is not a supported version.  Please upgrade and try again.", DockerVersion.COMPARATOR.compare(dockerVersion.get(), DockerVersion.parseVersionString(MINIMUM_DOCKER_VERSION)) >= 0);
         LOGGER.debug("Discovered valid docker client on host.  version: {}", dockerVersion);
+
+        hostIp = System.getProperty("host.ip");
+
+        if (hostIp == null) {
+            final Optional<String> foundHostIp = new DockerHostIpSupplier().get();
+            if (foundHostIp.isPresent()) {
+                hostIp = foundHostIp.get();
+            }
+        }
+        Assert.assertNotNull("Could not resolve host machine's IP address for docker adapter, and 'host.ip' system poperty not set. Client will not be able to authenticate against the keycloak server!", hostIp);
     }
 
     @Override
@@ -80,9 +94,9 @@ public class DockerClientTest extends AbstractKeycloakTest {
         environment.put("REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY", "/tmp");
         environment.put("REGISTRY_HTTP_TLS_CERTIFICATE", "/opt/certs/localhost.crt");
         environment.put("REGISTRY_HTTP_TLS_KEY", "/opt/certs/localhost.key");
-        environment.put("REGISTRY_AUTH_TOKEN_REALM", "http://localhost:8180/auth/realms/docker-test-realm/protocol/docker-v2/auth");
+        environment.put("REGISTRY_AUTH_TOKEN_REALM", "http://" + hostIp + ":8180/auth/realms/docker-test-realm/protocol/docker-v2/auth");
         environment.put("REGISTRY_AUTH_TOKEN_SERVICE", CLIENT_ID);
-        environment.put("REGISTRY_AUTH_TOKEN_ISSUER", "http://localhost:8180/auth/realms/docker-test-realm");
+        environment.put("REGISTRY_AUTH_TOKEN_ISSUER", "http://" + hostIp + ":8180/auth/realms/docker-test-realm");
         environment.put("REGISTRY_AUTH_TOKEN_ROOTCERTBUNDLE", "/opt/certs/docker-realm-public-key.pem");
         environment.put("INSECURE_REGISTRY", "--insecure-registry " + REGISTRY_HOSTNAME + ":" + REGISTRY_PORT);
 
@@ -92,7 +106,7 @@ public class DockerClientTest extends AbstractKeycloakTest {
         dockerRegistryContainer = new GenericContainer(dockerioPrefix + "registry:2")
                 .withClasspathResourceMapping("dockerClientTest/keycloak-docker-compose-yaml/certs", "/opt/certs", BindMode.READ_ONLY)
                 .withEnv(environment)
-                .withNetworkMode("host");
+                .withPrivilegedMode(true);
         dockerRegistryContainer.start();
         dockerRegistryContainer.followOutput(new Slf4jLogConsumer(LOGGER));
 
@@ -108,8 +122,12 @@ public class DockerClientTest extends AbstractKeycloakTest {
         )
                 .withClasspathResourceMapping("dockerClientTest/keycloak-docker-compose-yaml/certs/localhost.crt", "/opt/docker/certs.d/" + REGISTRY_HOSTNAME + "/localhost.crt", BindMode.READ_ONLY)
                 .withClasspathResourceMapping("dockerClientTest/keycloak-docker-compose-yaml/sysconfig_docker", "/etc/sysconfig/docker", BindMode.READ_WRITE)
-                .withNetworkMode("host")
                 .withPrivilegedMode(true);
+
+        final Optional<ContainerNetwork> network = dockerRegistryContainer.getContainerInfo().getNetworkSettings().getNetworks().values().stream().findFirst();
+        assumeTrue("Could not find a network adapter whereby the docker client container could connect to host!", network.isPresent());
+        dockerClientContainer.withExtraHost(REGISTRY_HOSTNAME, network.get().getIpAddress());
+
         dockerClientContainer.start();
         dockerClientContainer.followOutput(new Slf4jLogConsumer(LOGGER));
 

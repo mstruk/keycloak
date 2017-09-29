@@ -37,42 +37,30 @@ import java.util.logging.Logger;
 public enum Feature {
 
     /**
+     *   When you add, remove, or change a feature additional files will have to be modified as well.
      *
-     *   When you add, remove, or change a feature, you also have to modify methods: fromCaption() and isEnabledByDefault()
-     *
-     *   The following files will have to be modified as well:
-     *     - pom.xml (keycloak-parent - properties in 'community' and 'product' profiles)
-     *     - wildfly/server-subsystem/src/main/config/default-server-subsys-config.properties (<features> section)
-     *     - wildfly/server-subsystem/src/main/resources/subsystem-templates/keycloak-server.xml (<features> section)
-     *     - wildfly/server-subsystem/src/main/resources/cli/default-keycloak-subsys-config.cli
-     *     - wildfly/server-subsystem/src/test/java/org/keycloak/subsystem/server/extension/FeaturesTestCase.java (COMMUNITY_FEATURES, and PRODUCT_FEATURES constants)
-     *     - distribution/feature-packs/server-feature-pack/src/main/resources/content/bin/migrate-standalone.cli
-     *     - distribution/feature-packs/server-feature-pack/src/main/resources/content/bin/migrate-standalone-ha.cli
-     *     - distribution/feature-packs/server-feature-pack/src/main/resources/content/bin/migrate-domain-standalone.cli
-     *     - distribution/feature-packs/server-feature-pack/src/main/resources/content/bin/migrate-domain-clustered.cli
-     *     - distribution/distribution-tests/src/test/java/org/keycloak/test/distribution/DistributionFeaturesTest.java  (COMMUNITY_FEATURES, and PRODUCT_FEATURES constants)
-     *
-     *   In addition, the following files may need to be modified to support tests:
-     *     - testsuite/integration-arquillian/tests/base/src/test/resources/META-INF/keycloak-server.json (feature section)
-     *     - testsuite/utils/src/main/resources/META-INF/keycloak-server.json (feature section)
-     *
+     *   See README-developers.md 'Adding / Modifying Features' chapter for details.
      */
 
-    AUTHORIZATION(true), IMPERSONATION, SCRIPTS(true), DOCKER, ACCOUNT2(true), TOKEN_EXCHANGE;
+    AUTHORIZATION (true, Version.IS_COMMUNITY_VERSION),
+    IMPERSONATION (false, Version.IS_COMMUNITY_VERSION),
+    SCRIPTS (true, true),
+    DOCKER (false, false),
+    ACCOUNT2 (true, false),
+    TOKEN_EXCHANGE (false, Version.IS_COMMUNITY_VERSION);
 
 
     private static final Logger log = Logger.getLogger(Feature.class.getName());
 
     private boolean preview;
 
+    private boolean defaultValue;
+
     private static boolean foundBadConfig = false;
 
-    Feature() {
-        this.preview = false;
-    }
-
-    Feature(boolean preview) {
+    Feature(boolean preview, boolean defaultValue) {
         this.preview = preview;
+        this.defaultValue = defaultValue;
     }
 
     public String caption() {
@@ -81,7 +69,7 @@ public enum Feature {
     }
 
     public static Set<Feature> getDisabledFeatures() {
-        // by default all features are disabled
+
         HashSet<Feature> disabled = new HashSet(Arrays.asList(values()));
         Config.Scope config = Config.scope("feature");
         for (Feature f: values()) {
@@ -101,17 +89,12 @@ public enum Feature {
     }
 
     public static Feature fromCaption(String name) {
-        Feature ret = AUTHORIZATION.caption().equals(name) ? AUTHORIZATION :
-                IMPERSONATION.caption().equals(name) ? IMPERSONATION :
-                SCRIPTS.caption().equals(name) ? SCRIPTS :
-                DOCKER.caption().equals(name) ? DOCKER :
-                ACCOUNT2.caption().equals(name) ? ACCOUNT2 :
-                TOKEN_EXCHANGE.caption().equals(name) ? TOKEN_EXCHANGE : null;
-
-        if (ret == null) {
-            throw new IllegalArgumentException("No such feature: " + name);
+        for (Feature f: values()) {
+            if (f.caption().equals(name)) {
+                return f;
+            }
         }
-        return ret;
+        throw new IllegalArgumentException("No such feature: " + name);
     }
 
     public static List<String> validCaptions() {
@@ -126,36 +109,12 @@ public enum Feature {
 
     public boolean isEnabledByDefault() {
         // Value is dependent on whether this is a Keycloak release or some other
-        // Use defensive programming to catch possible issues when adding new features
-        if ("Keycloak".equals(Version.NAME)) {
-            switch (this) {
-                case AUTHORIZATION: return true;
-                case SCRIPTS: return true;
-                case IMPERSONATION: return true;
-                case DOCKER: return false;
-                case ACCOUNT2: return false;
-                case TOKEN_EXCHANGE: return true;
-                default:
-                    throw new RuntimeException("Internal error - feature unaccounted for: " + this);
-            }
-        } else {
-            switch (this) {
-                case AUTHORIZATION: return false;
-                case SCRIPTS: return false;
-                case IMPERSONATION: return true;
-                case DOCKER: return false;
-                case ACCOUNT2: return false;
-                case TOKEN_EXCHANGE: return false;
-                default:
-                    throw new RuntimeException("Internal error - feature unaccounted for: " + this);
-            }
-        }
+        return defaultValue;
     }
 
     public static void applyBackwardsCompatibilityOptions() {
-        // if feature is disabled in a deprecated way, still take it into account but
-        // print a warning
-        // check if profile.properties exists
+        // General rule:
+        //   If feature is disabled in a deprecated way, still take it into account but print a warning
 
         Properties props = new Properties();
 

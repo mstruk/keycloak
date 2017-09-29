@@ -33,6 +33,7 @@ public class Version {
     public static String RESOURCES_VERSION;
     public static String BUILD_TIME;
     public static String DEFAULT_PROFILE;
+    public static boolean IS_COMMUNITY_VERSION;
 
     static {
         Properties props = new Properties();
@@ -49,6 +50,9 @@ public class Version {
             if (Version.RESOURCES_VERSION.endsWith("-snapshot")) {
                 Version.RESOURCES_VERSION = Version.RESOURCES_VERSION.replace("-snapshot", "-" + Version.BUILD_TIME.replace(" ", "").replace(":", "").replace("-", ""));
             }
+
+            Version.IS_COMMUNITY_VERSION = "Keycloak".equals(Version.VERSION);
+
         } catch (IOException e) {
             Version.VERSION = Version.UNKNOWN;
             Version.BUILD_TIME = Version.UNKNOWN;

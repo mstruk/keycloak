@@ -20,6 +20,8 @@ package org.keycloak.common;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -27,35 +29,81 @@ import java.util.Properties;
  */
 public class Version {
     public static final String UNKNOWN = "UNKNOWN";
-    public static String NAME;
-    public static String NAME_HTML;
-    public static String VERSION;
-    public static String RESOURCES_VERSION;
-    public static String BUILD_TIME;
-    public static String DEFAULT_PROFILE;
-    public static boolean IS_COMMUNITY_VERSION;
 
-    static {
-        Properties props = new Properties();
-        InputStream is = Version.class.getResourceAsStream("/keycloak-version.properties");
-        try {
-            props.load(is);
-            Version.NAME = props.getProperty("name");
-            Version.NAME_HTML = props.getProperty("name-html");
-            Version.DEFAULT_PROFILE = props.getProperty("default-profile");
-            Version.VERSION = props.getProperty("version");
-            Version.BUILD_TIME = props.getProperty("build-time");
-            Version.RESOURCES_VERSION = Version.VERSION.toLowerCase();
+    private static final Builder builder = new Builder();
 
-            if (Version.RESOURCES_VERSION.endsWith("-snapshot")) {
-                Version.RESOURCES_VERSION = Version.RESOURCES_VERSION.replace("-snapshot", "-" + Version.BUILD_TIME.replace(" ", "").replace(":", "").replace("-", ""));
+    public static final String NAME = builder.getName();
+    public static final String NAME_HTML = builder.getNameHtml();
+    public static final String VERSION = builder.getVersion();
+    public static final String RESOURCES_VERSION = builder.getResourcesVersion();
+    public static final String BUILD_TIME = builder.getBuildTime();
+    public static final String DEFAULT_PROFILE = builder.getDefaultProfile();
+    public static final boolean IS_COMMUNITY_VERSION = builder.isCommunityVersion();
+
+
+    private static Logger log = Logger.getLogger(Version.class.getName());
+
+
+    private static class Builder {
+
+        private Properties p;
+
+        private Builder() {
+            Properties props = new Properties();
+            InputStream is = Version.class.getResourceAsStream("/keycloak-version.properties");
+            try {
+                props.load(is);
+            } catch(IOException e) {
+                props = null;
+                log.log(Level.WARNING, "Failed to load keycloak-version.properties", e);
             }
+            p = props;
+        }
 
-            Version.IS_COMMUNITY_VERSION = "Keycloak".equals(Version.VERSION);
+        String getName() {
+            return getProperty("name", null);
+        }
 
-        } catch (IOException e) {
-            Version.VERSION = Version.UNKNOWN;
-            Version.BUILD_TIME = Version.UNKNOWN;
+        String getNameHtml() {
+            return getProperty("name-html", null);
+        }
+
+        String getDefaultProfile() {
+            return getProperty("default-profile", null);
+        }
+
+        String getVersion() {
+            return getProperty("version", UNKNOWN);
+        }
+
+        String getBuildTime() {
+            String buildTimeOverride = System.getProperty("keycloak.version.buildtime");
+            if (buildTimeOverride != null) {
+                return buildTimeOverride;
+            }
+            return getProperty("build-time", UNKNOWN);
+        }
+
+        String getProperty(String name, String defaultValue) {
+            if (p == null) {
+                return defaultValue;
+            }
+            return p.getProperty(name);
+        }
+
+        String getResourcesVersion() {
+            if (p == null) {
+                return null;
+            }
+            String v = getVersion().toLowerCase();
+            if (v.endsWith("-snapshot")) {
+                v = v.replace("-snapshot", "-" + getBuildTime().replace(" ", "").replace(":", "").replace("-", ""));
+            }
+            return v;
+        }
+
+        boolean isCommunityVersion() {
+            return "Keycloak".equals(getVersion());
         }
     }
 

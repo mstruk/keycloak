@@ -119,7 +119,7 @@ public class KeycloakServer {
 
     public static void main(String[] args) throws Throwable {
         if (!System.getenv().containsKey("MAVEN_CMD_LINE_ARGS")) {
-            Version.BUILD_TIME = new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date());
+            System.setProperty("keycloak.version.buildtime", new SimpleDateFormat("yyyy-MM-dd HH:mm").format(new Date()));
         }
 
         bootstrapKeycloakServer(args);

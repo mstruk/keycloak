@@ -108,6 +108,10 @@ public class FeaturesTestCase {
                 args);
     }
 
+    private static void checkOverlayCli(String content) {
+        checkOverlayCli(content, FEATURES);
+    }
+
     private static void checkOverlayCli(String content, Object ... args) {
         forEach(
                 (feature, enabled) -> checkFeatureInCli(content, feature, enabled),

@@ -308,6 +308,13 @@
                             <keycloak.testsuite.logging.pattern>${keycloak.testsuite.logging.pattern}</keycloak.testsuite.logging.pattern>
 
                             <keycloak.connectionsJpa.url.crossdc>${keycloak.connectionsJpa.url.crossdc}</keycloak.connectionsJpa.url.crossdc>
+
+                            <keycloak.feature.authorization-preview.enabled>${keycloak.feature.authorization-preview.enabled}</keycloak.feature.authorization-preview.enabled>
+                            <keycloak.feature.impersonation.enabled>${keycloak.feature.impersonation.enabled}</keycloak.feature.impersonation.enabled>
+                            <keycloak.feature.scripts-preview.enabled>${keycloak.feature.scripts-preview.enabled}</keycloak.feature.scripts-preview.enabled>
+                            <keycloak.feature.docker.enabled>${keycloak.feature.docker.enabled}</keycloak.feature.docker.enabled>
+                            <keycloak.feature.account2-preview.enabled>${keycloak.feature.account2-preview.enabled}</keycloak.feature.account2-preview.enabled>
+                            <keycloak.feature.token-exchange.enabled>${keycloak.feature.token-exchange.enabled}</keycloak.feature.token-exchange.enabled>
                         </systemPropertyVariables>
                         <properties>
                             <property>
@@ -1299,7 +1306,41 @@
                 </kie.maven.settings>
             </properties>
         </profile>
-        
+
+        <profile>
+            <id>community</id>
+            <activation>
+                <property>
+                    <name>!product</name>
+                </property>
+            </activation>
+            <properties>
+                <keycloak.feature.authorization-preview.enabled>true</keycloak.feature.authorization-preview.enabled>
+                <keycloak.feature.impersonation.enabled>true</keycloak.feature.impersonation.enabled>
+                <keycloak.feature.scripts-preview.enabled>true</keycloak.feature.scripts-preview.enabled>
+                <keycloak.feature.docker.enabled>false</keycloak.feature.docker.enabled>
+                <keycloak.feature.account2-preview.enabled>false</keycloak.feature.account2-preview.enabled>
+                <keycloak.feature.token-exchange.enabled>true</keycloak.feature.token-exchange.enabled>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>product</id>
+            <activation>
+                <property>
+                    <name>product</name>
+                </property>
+            </activation>
+            <properties>
+                <keycloak.feature.authorization-preview.enabled>false</keycloak.feature.authorization-preview.enabled>
+                <keycloak.feature.impersonation.enabled>true</keycloak.feature.impersonation.enabled>
+                <keycloak.feature.scripts-preview.enabled>false</keycloak.feature.scripts-preview.enabled>
+                <keycloak.feature.docker.enabled>false</keycloak.feature.docker.enabled>
+                <keycloak.feature.account2-preview.enabled>false</keycloak.feature.account2-preview.enabled>
+                <keycloak.feature.token-exchange.enabled>false</keycloak.feature.token-exchange.enabled>
+            </properties>
+        </profile>
+
     </profiles>
     
 </project>

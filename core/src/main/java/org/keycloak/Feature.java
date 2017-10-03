@@ -39,7 +39,7 @@ public enum Feature {
     /**
      *   When you add, remove, or change a feature additional files will have to be modified as well.
      *
-     *   See README-developers.md 'Adding / Modifying Features' chapter for details.
+     *   See /misc/Features.md for details.
      */
 
     AUTHORIZATION (true, Version.IS_COMMUNITY_VERSION),
@@ -166,7 +166,7 @@ public enum Feature {
                     log.warning("System property '" + k + "' has been deprecated. Use '" + properKey + "=" + properValue + "' instead.");
 
                 } catch (Exception e) {
-                    log.warning("Unknown feature: " + k);
+                    log.warning("Unknown feature for system property: " + k);
                 }
             } else if (k.equals("keycloak.profile")) {
                 foundBadConfig = true;
@@ -176,7 +176,7 @@ public enum Feature {
                     Feature.fromCaption(k.substring("feature.".length()).toLowerCase());
                 } catch (Exception e) {
                     foundBadConfig = true;
-                    log.warning("Unknown feature: " + k);
+                    log.warning("Unknown feature for system property: " + k);
                 }
             }
         }

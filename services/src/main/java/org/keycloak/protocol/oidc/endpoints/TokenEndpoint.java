@@ -37,6 +37,7 @@ import org.keycloak.common.constants.ServiceAccountConstants;
 import org.keycloak.common.util.Base64Url;
 import org.keycloak.common.util.KeycloakUriBuilder;
 import org.keycloak.constants.AdapterConstants;
+import org.keycloak.credential.InvalidCacheStateException;
 import org.keycloak.events.Details;
 import org.keycloak.events.Errors;
 import org.keycloak.events.EventBuilder;
@@ -153,15 +154,39 @@ public class TokenEndpoint {
 
     @POST
     public Response processGrantRequest() {
-        cors = Cors.add(request).auth().allowedMethods("POST").auth().exposedHeaders(Cors.ACCESS_CONTROL_ALLOW_METHODS);
+        try {
+            logger.info("POST token");
 
-        formParams = request.getDecodedFormParameters();
-        grantType = formParams.getFirst(OIDCLoginProtocol.GRANT_TYPE_PARAM);
+            cors = Cors.add(request).auth().allowedMethods("POST").auth().exposedHeaders(Cors.ACCESS_CONTROL_ALLOW_METHODS);
 
-        checkSsl();
-        checkRealm();
-        checkGrantType();
-        checkClient();
+            formParams = request.getDecodedFormParameters();
+            grantType = formParams.getFirst(OIDCLoginProtocol.GRANT_TYPE_PARAM);
+
+            checkSsl();
+            checkRealm();
+            checkGrantType();
+            checkClient();
+
+            try {
+                return processAction();
+
+            } catch (InvalidCacheStateException ex) {
+                // sleep a little then try again
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException("Signalled to exit");
+                }
+                logger.info("Try processAction() again");
+                return processAction();
+            }
+        } catch (Exception e) {
+            logger.error("Exception occured: ", e);
+            throw e;
+        }
+    }
+
+    Response processAction() {
 
         switch (action) {
             case AUTHORIZATION_CODE:

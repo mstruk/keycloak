@@ -186,7 +186,7 @@ public class PasswordCredentialProvider implements CredentialProvider, Credentia
         CredentialModel password = getPassword(realm, user);
         if (password == null) {
             logger.debugv("No password cached or stored for user {0} ", user.getUsername());
-            return false;
+            throw new InvalidCacheStateException("No password cached or stored for user");
         }
         PasswordHashProvider hash = session.getProvider(PasswordHashProvider.class, password.getAlgorithm());
         if (hash == null) {

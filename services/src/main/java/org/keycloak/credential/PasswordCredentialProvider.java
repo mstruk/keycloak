@@ -59,6 +59,10 @@ public class PasswordCredentialProvider implements CredentialProvider, Credentia
         List<CredentialModel> passwords = null;
         if (user instanceof CachedUserModel && !((CachedUserModel)user).isMarkedForEviction()) {
             CachedUserModel cached = (CachedUserModel)user;
+            // if another thread is initialising the cached user right now
+            // we wait for a maximum one second for it to finish - usually we should not wait that long
+            // and if we do, retrieval from cache in the following line will likely return null
+            cached.ensureInited(1000);
             passwords = (List<CredentialModel>)cached.getCachedWith().get(PASSWORD_CACHE_KEY);
 
         }

@@ -129,11 +129,11 @@ public abstract class CacheManager {
         Object rev = revisions.put(id, next);
     }
 
-    public void addRevisioned(Revisioned object, long startupRevision) {
-        addRevisioned(object, startupRevision, -1);
+    public boolean addRevisioned(Revisioned object, long startupRevision) {
+        return addRevisioned(object, startupRevision, -1);
     }
 
-    public void addRevisioned(Revisioned object, long startupRevision, long lifespan) {
+    public boolean addRevisioned(Revisioned object, long startupRevision, long lifespan) {
         //startRevisionBatch();
         String id = object.getId();
         try {
@@ -148,34 +148,37 @@ public abstract class CacheManager {
                 if (getLogger().isTraceEnabled()) {
                     getLogger().tracev("Could not obtain version lock: {0}", id);
                 }
-                return;
+                return false;
             }
             rev = revisions.get(id);
             if (rev == null) {
-                return;
+                return false;
             }
             if (rev > startupRevision) { // revision is ahead transaction start. Other transaction updated in the meantime. Don't cache
                 if (getLogger().isTraceEnabled()) {
                     getLogger().tracev("Skipped cache. Current revision {0}, Transaction start revision {1}", object.getRevision(), startupRevision);
                 }
-                return;
+                return false;
             }
             if (rev.equals(object.getRevision())) {
                 cache.putForExternalRead(id, object);
-                return;
+                return true;
             }
             if (rev > object.getRevision()) { // revision is ahead, don't cache
                 if (getLogger().isTraceEnabled()) getLogger().tracev("Skipped cache. Object revision {0}, Cache revision {1}", object.getRevision(), rev);
-                return;
+                return false;
             }
             // revisions cache has a lower value than the object.revision, so update revision and add it to cache
             revisions.put(id, object.getRevision());
-            if (lifespan < 0) cache.putForExternalRead(id, object);
-            else cache.putForExternalRead(id, object, lifespan, TimeUnit.MILLISECONDS);
+            if (lifespan < 0) {
+                cache.putForExternalRead(id, object);
+            } else {
+                cache.putForExternalRead(id, object, lifespan, TimeUnit.MILLISECONDS);
+            }
+            return true;
         } finally {
             endRevisionBatch();
         }
-
     }
 
     public void clear() {

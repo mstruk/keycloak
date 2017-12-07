@@ -392,6 +392,9 @@ public class UserAdapter implements CachedUserModel {
     }
 
 
-
+    @Override
+    public boolean ensureInited(long timeoutMillis) {
+        return cached.ensureInited(timeoutMillis);
+    }
 
 }

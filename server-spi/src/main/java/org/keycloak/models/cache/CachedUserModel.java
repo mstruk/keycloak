@@ -56,4 +56,16 @@ public interface CachedUserModel extends UserModel {
      * @return
      */
     ConcurrentMap getCachedWith();
+
+    /**
+     * If object is currently in the middle of initialisation, wait for it to finish, but not more then
+     * a specified amount of milliseconds.
+     *
+     * The assumption is that current thread is not the one performing initialisation.
+     *
+     * @param timeoutMillis maximum wait time in millis
+     * @return true if upon return the object is in initialised state, false otherwise
+     */
+    boolean ensureInited(long timeoutMillis);
+
 }

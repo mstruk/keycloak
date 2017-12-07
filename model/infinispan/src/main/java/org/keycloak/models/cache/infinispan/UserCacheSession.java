@@ -342,7 +342,10 @@ public class UserCacheSession implements UserCache {
 
         StorageId storageId = delegate.getFederationLink() != null ?
                 new StorageId(delegate.getFederationLink(), delegate.getId()) : new StorageId(delegate.getId());
-        CachedUser cached = null;
+
+        CachedUser user = null;
+        boolean addedInCache = false;
+
         if (!storageId.isLocal()) {
             ComponentModel component = realm.getComponent(storageId.getProviderId());
             UserStorageProviderModel model = new UserStorageProviderModel(component);
@@ -350,9 +353,9 @@ public class UserCacheSession implements UserCache {
             if (policy != null && policy == UserStorageProviderModel.CachePolicy.NO_CACHE) {
                 return delegate;
             }
-            cached = new CachedUser(revision, realm, delegate, notBefore);
+            user = new CachedUser(revision, realm, delegate, notBefore);
             if (policy == null || policy == UserStorageProviderModel.CachePolicy.DEFAULT) {
-                cache.addRevisioned(cached, startupRevision);
+                addedInCache = cache.addRevisioned(user, startupRevision);
             } else {
                 long lifespan = -1;
                 if (policy == UserStorageProviderModel.CachePolicy.EVICT_DAILY) {
@@ -367,19 +370,55 @@ public class UserCacheSession implements UserCache {
                     lifespan = model.getMaxLifespan();
                 }
                 if (lifespan > 0) {
-                    cache.addRevisioned(cached, startupRevision, lifespan);
+                    addedInCache = cache.addRevisioned(user, startupRevision, lifespan);
                 } else {
-                    cache.addRevisioned(cached, startupRevision);
+                    addedInCache = cache.addRevisioned(user, startupRevision);
                 }
             }
         } else {
-            cached = new CachedUser(revision, realm, delegate, notBefore);
-            cache.addRevisioned(cached, startupRevision);
+            user = new CachedUser(revision, realm, delegate, notBefore);
+            addedInCache = cache.addRevisioned(user, startupRevision);
         }
-        UserAdapter adapter = new UserAdapter(cached, this, session, realm);
-        onCache(realm, adapter, delegate);
-        return adapter;
 
+
+        CachedUser cachedUser = addedInCache ? user : null;
+
+        if (cachedUser == null) {
+            // Not added in cache
+            cachedUser = cache.get(user.getId(), CachedUser.class);
+        }
+
+
+        if (cachedUser == null) {
+            // Failed to cache user and cache appears empty
+            // We still need to continue so we need to make sure entry is properly initialised
+            // even though it didn't enter the cache
+            UserAdapter adapter = new UserAdapter(user, this, session, realm);
+            onCache(realm, adapter, delegate);
+            return adapter;
+        }
+
+
+        UserAdapter adapter = new UserAdapter(cachedUser, this, session, realm);
+        if (addedInCache) {
+            boolean weInit = cachedUser.lockForInit();
+            if (weInit) {
+                try {
+                    onCache(realm, adapter, delegate);
+                } finally {
+                    cachedUser.unlockInit();
+                }
+            }
+        } else {
+            // make sure cache initialisation is completed for this cached user
+            // if not, wait for it for a maximum of one second
+            boolean inited = cachedUser.ensureInited(1000);
+            if (!inited) {
+                // unexpected but let's not fail fast
+                logger.debug("timed out waiting for cached entry to be fully inited");
+            }
+        }
+        return adapter;
     }
 
 

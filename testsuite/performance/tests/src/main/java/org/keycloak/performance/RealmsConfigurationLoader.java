@@ -29,6 +29,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import static org.keycloak.performance.RealmsConfigurationBuilder.EXPORT_FILENAME;
 
 import static org.keycloak.performance.TestConfig.numOfWorkers;
+import static org.keycloak.performance.TestConfig.startAtRealmIdx;
+import static org.keycloak.performance.TestConfig.startAtUserIdx;
 
 /**
  * # build
@@ -45,6 +47,12 @@ import static org.keycloak.performance.TestConfig.numOfWorkers;
 public class RealmsConfigurationLoader {
 
     static final int ERROR_CHECK_INTERVAL = 10;
+
+    static int currentRealm = 0;
+    static int currentUser = 0;
+    static int currentRealmRole = 0;
+
+    static boolean started;
 
     // multi-thread mechanics
     static final BlockingQueue<AdminJob> queue = new LinkedBlockingQueue<>(numOfWorkers);
@@ -158,57 +166,89 @@ public class RealmsConfigurationLoader {
         // as soon as we encounter users, roles, clients we create a CreateRealmJob
         // TODO: if after that point in a realm we encounter realm attribute, we report a warning but continue
 
-        RealmRepresentation r = new RealmRepresentation();
-        JsonToken t = p.nextToken();
-        while (t != JsonToken.END_OBJECT) {
+        boolean skip = false;
+        try {
+            RealmRepresentation r = new RealmRepresentation();
+            JsonToken t = p.nextToken();
+            while (t != JsonToken.END_OBJECT && !skip) {
 
-            //System.out.println(t + ", name: " + p.getCurrentName() + ", text: '" + p.getText() + "', value: " + p.getValueAsString());
+                //System.out.println(t + ", name: " + p.getCurrentName() + ", text: '" + p.getText() + "', value: " + p.getValueAsString());
 
-            switch (p.getCurrentName()) {
-                case "realm":
-                    r.setRealm(getStringValue(p));
-                    break;
-                case "enabled":
-                    r.setEnabled(getBooleanValue(p));
-                    break;
-                case "accessTokenLifespan":
-                    r.setAccessCodeLifespan(getIntegerValue(p));
-                    break;
-                case "registrationAllowed":
-                    r.setRegistrationAllowed(getBooleanValue(p));
-                    break;
-                case "passwordPolicy":
-                    r.setPasswordPolicy(getStringValue(p));
-                    break;
-                case "users":
-                    ensureRealm(r);
-                    readUsers(r, p);
-                    break;
-                case "roles":
-                    ensureRealm(r);
-                    readRoles(r, p);
-                    break;
-                case "clients":
-                    ensureRealm(r);
-                    readClients(r, p);
-                    break;
-                default: {
-                    // if we don't understand the field we ignore it - but report that
-                    System.out.println("Realm attribute ignored: " + p.getCurrentName());
-                    consumeAttribute(p);
+                switch (p.getCurrentName()) {
+                    case "realm":
+                        r.setRealm(getStringValue(p));
+                        skip = !started && realmSkipped(r.getRealm());
+                        break;
+                    case "enabled":
+                        r.setEnabled(getBooleanValue(p));
+                        break;
+                    case "accessTokenLifespan":
+                        r.setAccessCodeLifespan(getIntegerValue(p));
+                        break;
+                    case "registrationAllowed":
+                        r.setRegistrationAllowed(getBooleanValue(p));
+                        break;
+                    case "passwordPolicy":
+                        r.setPasswordPolicy(getStringValue(p));
+                        break;
+                    case "users":
+                        ensureRealm(r);
+                        readUsers(r, p);
+                        break;
+                    case "roles":
+                        ensureRealm(r);
+                        readRoles(r, p);
+                        break;
+                    case "clients":
+                        ensureRealm(r);
+                        readClients(r, p);
+                        break;
+                    default: {
+                        // if we don't understand the field we ignore it - but report that
+                        System.out.println("Realm attribute ignored: " + p.getCurrentName());
+                        consumeAttribute(p);
+                    }
                 }
+
+                t = p.nextToken();
             }
+
+            if (skip) {
+                System.out.println("Realm skipped: " + r.getRealm());
+                consumeParent(p);
+            }
+
+        } finally {
+            // we wait for realm to complete
+            completePending();
+
+            // reset realm specific cache
+            realmCreated = false;
+            clientIdMap.clear();
+            realmRoleIdMap.clear();
+            clientRoleIdMap.clear();
+        }
+    }
+
+    private static void consumeParent(JsonParser p) throws IOException {
+        JsonToken t = p.currentToken();
+        while (t != JsonToken.END_OBJECT) {
+            consumeAttribute(p);
             t = p.nextToken();
         }
+    }
 
-        // we wait for realm to complete
-        completePending();
+    private static boolean realmSkipped(String realm) {
+        int pos = realm.lastIndexOf("_");
+        int idx = Integer.parseInt(realm.substring(pos+1));
+        return idx < startAtRealmIdx;
+    }
 
-        // reset realm specific cache
-        realmCreated = false;
-        clientIdMap.clear();
-        realmRoleIdMap.clear();
-        clientRoleIdMap.clear();
+    private static boolean userSkipped(String username) {
+        int pos = username.indexOf("_");
+        int end = username.indexOf("_", pos+1);
+        int idx = Integer.parseInt(username.substring(pos+1, end));
+        return idx < startAtUserIdx;
     }
 
     private static void ensureRealm(RealmRepresentation r) {
@@ -220,6 +260,7 @@ public class RealmsConfigurationLoader {
 
     private static void createRealm(RealmRepresentation r) {
         try {
+            started = true;
             queue.put(new CreateRealmJob(r));
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
@@ -248,6 +289,7 @@ public class RealmsConfigurationLoader {
 
     private static void enqueueCreateUser(RealmRepresentation r, UserRepresentation u) {
         try {
+            started = true;
             queue.put(new CreateUserJob(r, u));
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
@@ -256,6 +298,7 @@ public class RealmsConfigurationLoader {
 
     private static void enqueueCreateRealmRole(RealmRepresentation r, RoleRepresentation role) {
         try {
+            started = true;
             queue.put(new CreateRealmRoleJob(r, role));
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
@@ -264,6 +307,7 @@ public class RealmsConfigurationLoader {
 
     private static void enqueueCreateClientRole(RealmRepresentation r, RoleRepresentation role, String client) {
         try {
+            started = true;
             queue.put(new CreateClientRoleJob(r, role, client));
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
@@ -272,6 +316,7 @@ public class RealmsConfigurationLoader {
 
     private static void enqueueCreateClient(RealmRepresentation r, ClientRepresentation client) {
         try {
+            started = true;
             queue.put(new CreateClientJob(r, client));
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted", e);
@@ -303,14 +348,18 @@ public class RealmsConfigurationLoader {
         t = p.nextToken();
         while (t == JsonToken.START_OBJECT) {
             UserRepresentation u = p.readValueAs(UserRepresentation.class);
-            enqueueCreateUser(r, u);
+            if (!started && userSkipped(u.getUsername())) {
+                System.out.println("User skipped: " + u.getUsername());
+            } else {
+                enqueueCreateUser(r, u);
+            }
             t = p.nextToken();
             count += 1;
 
             // every some users check to see pending errors
             // in order to short-circuit if any errors have occurred
             if (count % ERROR_CHECK_INTERVAL == 0) {
-                checkPendingErrors();
+                checkPendingErrors(u.getUsername());
             }
         }
     }
@@ -374,7 +423,7 @@ public class RealmsConfigurationLoader {
                 // every some roles check to see pending errors
                 // in order to short-circuit if any errors have occurred
                 if (count % ERROR_CHECK_INTERVAL == 0) {
-                    checkPendingErrors();
+                    checkPendingErrors(u.getName());
                 }
             }
             t = p.nextToken();
@@ -400,7 +449,7 @@ public class RealmsConfigurationLoader {
             // every some roles check to see pending errors
             // in order to short-circuit if any errors have occurred
             if (count % ERROR_CHECK_INTERVAL == 0) {
-                checkPendingErrors();
+                checkPendingErrors(u.getName());
             }
         }
     }
@@ -420,12 +469,12 @@ public class RealmsConfigurationLoader {
 
             // every some users check to see pending errors
             if (count % ERROR_CHECK_INTERVAL == 0) {
-                checkPendingErrors();
+                checkPendingErrors(u.getClientId());
             }
         }
     }
 
-    private static void checkPendingErrors() {
+    private static void checkPendingErrors(String label) {
         // now wait for job to appear
         PendingResult next = pendingResult.peek();
         while (next == null) {
@@ -445,7 +494,7 @@ public class RealmsConfigurationLoader {
                 } catch (InterruptedException e) {
                     throw new RuntimeException("Interrupted");
                 } catch (ExecutionException e) {
-                    throw new RuntimeException("Execution failed", e.getCause());
+                    throw new RuntimeException("Execution failed in the vicinity of " + label + ": ", e.getCause());
                 }
             }
         }

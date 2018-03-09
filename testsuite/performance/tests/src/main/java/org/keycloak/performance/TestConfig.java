@@ -31,6 +31,8 @@ public class TestConfig {
     // Settings used by RealmsConfigurationLoader only - when loading data into Keycloak
     //
     public static final int numOfWorkers = Integer.getInteger("numOfWorkers", 1);
+    public static final int startAtRealmIdx = Integer.getInteger("startAtRealmIdx", 0);
+    public static final int startAtUserIdx = Integer.getInteger("startAtUserIdx", 0);
 
     //
     // Settings used by RealmConfigurationLoader to connect to Admin REST API

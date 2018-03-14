@@ -177,6 +177,7 @@
                             <goal>read-project-properties</goal>
                         </goals>
                         <configuration>
+                            <quiet>true</quiet>
                             <files>
                                 <file>${provisioning.properties.file}</file>
                                 <file>${dataset.properties.file}</file>
